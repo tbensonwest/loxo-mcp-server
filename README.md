@@ -18,7 +18,13 @@ npm run build
 
 ## Configuration
 
-Create a `.env` file in the root directory with the following variables:
+Copy the provided `.env.example` file to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Then update the `.env` file with your configuration:
 
 ```env
 LOXO_API_KEY=your_api_key
