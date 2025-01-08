@@ -49,7 +49,9 @@ const ScheduleActivitySchema = z.object({
     notes: z.string().optional()
 });
 const SearchSchema = z.object({
-    query: z.string(),
+    query: z.string().optional(),
+    company: z.string().optional(),
+    title: z.string().optional(),
     page: z.number().optional().default(1),
     per_page: z.number().optional().default(10)
 });
@@ -178,13 +180,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             {
                 name: "search-candidates",
-                description: "Search for candidates in Loxo",
+                description: "Search for candidates in Loxo with specific criteria",
                 inputSchema: {
                     type: "object",
                     properties: {
                         query: {
                             type: "string",
-                            description: "Search query for candidates"
+                            description: "General search query (optional)"
+                        },
+                        company: {
+                            type: "string",
+                            description: "Company name to search for (optional)"
+                        },
+                        title: {
+                            type: "string",
+                            description: "Job title to search for (optional)"
                         },
                         page: {
                             type: "number",
@@ -194,8 +204,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                             type: "number",
                             description: "Number of results per page"
                         }
-                    },
-                    required: ["query"]
+                    }
                 }
             },
             {
@@ -312,12 +321,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "spark-search-activity-types": {
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/spark-search/activity_types`);
-                return {
-                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
-                };
-            }
             case "get-todays-tasks": {
                 // Get today's date in YYYY-MM-DD format
                 const today = new Date().toISOString().split('T')[0];
@@ -376,24 +379,63 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "search-candidates": {
-                const { query, page, per_page } = SearchSchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/candidates/search?q=${encodeURIComponent(query)}&page=${page}&per_page=${per_page}`);
+                const { query, company, title, page, per_page } = SearchSchema.parse(args);
+                // Build search query
+                let searchParams = new URLSearchParams();
+                if (page)
+                    searchParams.append('page', page.toString());
+                if (per_page)
+                    searchParams.append('per_page', per_page.toString());
+                // Construct advanced search query
+                let searchQuery = [];
+                if (query)
+                    searchQuery.push(query);
+                if (company)
+                    searchQuery.push(`company:"${company}"`);
+                if (title)
+                    searchQuery.push(`title:"${title}"`);
+                // Combine search terms
+                const finalQuery = searchQuery.join(' AND ');
+                searchParams.append('q', finalQuery || '*'); // Use * as default if no query terms
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/search?${searchParams.toString()}`);
+                // Format response to highlight relevant job profile matches
+                const formattedResponse = {
+                    ...response,
+                    results: response.results?.map((candidate) => ({
+                        ...candidate,
+                        matching_profiles: candidate.job_profiles?.filter((profile) => (!company || profile.company?.name?.toLowerCase().includes(company.toLowerCase())) &&
+                            (!title || profile.title?.toLowerCase().includes(title.toLowerCase())))
+                    }))
+                };
                 return {
-                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify(formattedResponse, null, 2)
+                        }]
                 };
             }
             case "get-candidate": {
                 const { id } = EntityIdSchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/candidates/${id}`);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
             case "search-jobs": {
                 const { query, page, per_page } = SearchSchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/search?q=${encodeURIComponent(query)}&page=${page}&per_page=${per_page}`);
+                // Build search params
+                let searchParams = new URLSearchParams();
+                if (page)
+                    searchParams.append('page', page.toString());
+                if (per_page)
+                    searchParams.append('per_page', per_page.toString());
+                searchParams.append('q', query || '*'); // Use * as default if no query
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/search?${searchParams.toString()}`);
                 return {
-                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                    content: [{
+                            type: "text",
+                            text: JSON.stringify(response, null, 2)
+                        }]
                 };
             }
             case "get-job": {

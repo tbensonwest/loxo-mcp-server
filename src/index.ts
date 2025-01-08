@@ -13,32 +13,52 @@ const env = validateEnv();
 // Construct API base URL using domain from config
 const LOXO_API_BASE = `https://${env.LOXO_DOMAIN}/api`;
 
-// Helper function for API calls
-async function makeRequest(endpoint: string, options: RequestInit = {}) {
-  const url = `${LOXO_API_BASE}${endpoint}`;
-  const headers = {
-    'accept': 'application/json',
-    'authorization': `Bearer ${env.LOXO_API_KEY}`,
-    ...options.headers
-  };
-
-  try {
-    const response = await fetch(url, { ...options, headers });
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText}\nResponse: ${errorText}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('API request error:', error);
-    console.error('Request details:', {
-      url,
-      headers,
-      method: options.method || 'GET'
-    });
-    throw error;
+// Add these type definitions near the top with other types
+interface JobProfile {
+    title?: string;
+    company?: {
+      name?: string;
+    };
   }
-}
+  
+  interface Candidate {
+    id: string;
+    name?: string;
+    job_profiles?: JobProfile[];
+    // Add other relevant fields
+  }
+  
+  interface SearchResponse {
+    results: Candidate[];
+    // Add other response fields like total_count, etc.
+  }
+
+// Helper function for API calls
+async function makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${LOXO_API_BASE}${endpoint}`;
+    const headers = {
+      'accept': 'application/json',
+      'authorization': `Bearer ${env.LOXO_API_KEY}`,
+      ...options.headers
+    };
+  
+    try {
+      const response = await fetch(url, { ...options, headers });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} ${response.statusText}\nResponse: ${errorText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('API request error:', error);
+      console.error('Request details:', {
+        url,
+        headers,
+        method: options.method || 'GET'
+      });
+      throw error;
+    }
+  }
 
 // Add before the server creation
 // Add after imports
@@ -58,10 +78,12 @@ const ScheduleActivitySchema = z.object({
 });
 
 const SearchSchema = z.object({
-  query: z.string(),
-  page: z.number().optional().default(1),
-  per_page: z.number().optional().default(10)
-});
+    query: z.string().optional(),
+    company: z.string().optional(),
+    title: z.string().optional(),
+    page: z.number().optional().default(1),
+    per_page: z.number().optional().default(10)
+  });
 
 const EntityIdSchema = z.object({
   id: z.string()
@@ -202,13 +224,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "search-candidates",
-        description: "Search for candidates in Loxo",
+        description: "Search for candidates in Loxo with specific criteria",
         inputSchema: {
           type: "object",
           properties: {
             query: {
               type: "string",
-              description: "Search query for candidates"
+              description: "General search query (optional)"
+            },
+            company: {
+              type: "string",
+              description: "Company name to search for (optional)"
+            },
+            title: {
+              type: "string",
+              description: "Job title to search for (optional)"
             },
             page: {
               type: "number",
@@ -218,8 +248,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "number",
               description: "Number of results per page"
             }
-          },
-          required: ["query"]
+          }
         }
       },
       {
@@ -339,13 +368,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      case "spark-search-activity-types": {
-        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/spark-search/activity_types`);
-        return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
-        };
-      }
-
       case "get-todays-tasks": {
         // Get today's date in YYYY-MM-DD format
         const today = new Date().toISOString().split('T')[0];
@@ -418,16 +440,50 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "search-candidates": {
-        const { query, page, per_page } = SearchSchema.parse(args);
-        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/candidates/search?q=${encodeURIComponent(query)}&page=${page}&per_page=${per_page}`);
+        const { query, company, title, page, per_page } = SearchSchema.parse(args);
+        
+        // Build search query
+        let searchParams = new URLSearchParams();
+        if (page) searchParams.append('page', page.toString());
+        if (per_page) searchParams.append('per_page', per_page.toString());
+        
+        // Construct advanced search query
+        let searchQuery: string[] = [];
+        if (query) searchQuery.push(query);
+        if (company) searchQuery.push(`company:"${company}"`);
+        if (title) searchQuery.push(`title:"${title}"`);
+        
+        // Combine search terms
+        const finalQuery = searchQuery.join(' AND ');
+        searchParams.append('q', finalQuery || '*'); // Use * as default if no query terms
+        
+        const response = await makeRequest<SearchResponse>(
+          `/${env.LOXO_AGENCY_SLUG}/people/search?${searchParams.toString()}`
+        );
+      
+        // Format response to highlight relevant job profile matches
+        const formattedResponse = {
+          ...response,
+          results: response.results?.map((candidate: Candidate) => ({
+            ...candidate,
+            matching_profiles: candidate.job_profiles?.filter((profile: JobProfile) => 
+              (!company || profile.company?.name?.toLowerCase().includes(company.toLowerCase())) &&
+              (!title || profile.title?.toLowerCase().includes(title.toLowerCase()))
+            )
+          }))
+        };
+      
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(formattedResponse, null, 2) 
+          }]
         };
       }
 
       case "get-candidate": {
         const { id } = EntityIdSchema.parse(args);
-        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/candidates/${id}`);
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}`);
         return {
           content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
         };
@@ -435,9 +491,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case "search-jobs": {
         const { query, page, per_page } = SearchSchema.parse(args);
-        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/search?q=${encodeURIComponent(query)}&page=${page}&per_page=${per_page}`);
+        
+        // Build search params
+        let searchParams = new URLSearchParams();
+        if (page) searchParams.append('page', page.toString());
+        if (per_page) searchParams.append('per_page', per_page.toString());
+        searchParams.append('q', query || '*'); // Use * as default if no query
+        
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/jobs/search?${searchParams.toString()}`
+        );
+        
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(response, null, 2) 
+          }]
         };
       }
 
