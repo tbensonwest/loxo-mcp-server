@@ -1,0 +1,11 @@
+{
+  "version": "1.0",
+  "apis": [
+    {
+      "identifier": "loxo",
+      "source": "@loxo/v1.0#1j02ergm49j0fm7",
+      "integrity": "sha512-NkvCm5aoK5fDOiHoDAICquvw3f0u7rCMlatT4Z3KSmLPg6mMqxIr9psfO+DjLP70bZk5I3+Xz216NSizILHUaQ==",
+      "installerVersion": "6.1.2"
+    }
+  ]
+}
