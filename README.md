@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server that provides tools for interacting with the Loxo recruitment platform API. This server enables AI assistants to perform various recruitment-related tasks such as managing candidates, jobs, activities, and call queues.
 
+<a href="https://glama.ai/mcp/servers/rj00ooup46"><img width="380" height="200" src="https://glama.ai/mcp/servers/rj00ooup46/badge" alt="Loxo Server MCP server" /></a>
+
 ## Installation
 
 ```bash
