@@ -1,0 +1,25 @@
+# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+
+startCommand:
+  type: stdio
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - loxoApiKey
+      - loxoAgencySlug
+    properties:
+      loxoApiKey:
+        type: string
+        description: Your Loxo API key
+      loxoAgencySlug:
+        type: string
+        description: Your agency's slug in Loxo
+      loxoDomain:
+        type: string
+        default: app.loxo.co
+        description: Domain for the Loxo API
+  commandFunction:
+    # A function that produces the CLI command to start the MCP on stdio.
+    |-
+    (config) => ({ command: 'node', args: ['build/index.js'], env: { LOXO_API_KEY: config.loxoApiKey, LOXO_AGENCY_SLUG: config.loxoAgencySlug, LOXO_DOMAIN: config.loxoDomain || 'app.loxo.co' } })
