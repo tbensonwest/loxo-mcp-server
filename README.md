@@ -1,9 +1,20 @@
 # Loxo MCP Server
 
+[![smithery badge](https://smithery.ai/badge/loxo-mcp-server)](https://smithery.ai/server/loxo-mcp-server)
+
 A Model Context Protocol (MCP) server that provides tools for interacting with the Loxo recruitment platform API. This server enables AI assistants to perform various recruitment-related tasks such as managing candidates, jobs, activities, and call queues.
 
 ## Installation
 
+### Installing via Smithery
+
+To install Loxo Recruitment for Claude Desktop automatically via [Smithery](https://smithery.ai/server/loxo-mcp-server):
+
+```bash
+npx -y @smithery/cli install loxo-mcp-server --client claude
+```
+
+### Manual Installation
 ```bash
 # Clone the repository
 git clone [repository-url]
