@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tbensonwest-loxo-mcp-server-badge.png)](https://mseep.ai/app/tbensonwest-loxo-mcp-server)
+
 # Loxo MCP Server
 
 A Model Context Protocol (MCP) server that provides tools for interacting with the Loxo recruitment platform API. This server enables AI assistants to perform various recruitment-related tasks such as managing candidates, jobs, activities, and call queues.
