@@ -17,17 +17,26 @@ async function makeRequest(endpoint, options = {}) {
     };
     try {
         const response = await fetch(url, { ...options, headers });
+        const responseText = await response.text();
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API request failed: ${response.status} ${response.statusText}\nResponse: ${errorText}`);
+            console.error('API Response:', {
+                status: response.status,
+                statusText: response.statusText,
+                body: responseText
+            });
+            throw new Error(`API request failed: ${response.status} ${response.statusText}\nResponse: ${responseText}`);
         }
-        return await response.json();
+        // Only try to parse as JSON if we have content
+        return responseText ? JSON.parse(responseText) : null;
     }
     catch (error) {
         console.error('API request error:', error);
         console.error('Request details:', {
             url,
-            headers,
+            headers: {
+                ...headers,
+                authorization: '[REDACTED]' // Don't log the full token
+            },
             method: options.method || 'GET'
         });
         throw error;
@@ -35,39 +44,53 @@ async function makeRequest(endpoint, options = {}) {
 }
 // Add before the server creation
 // Add after imports
-const CallQueueSchema = z.object({
-    entity_type: z.enum(["candidate", "contact"]),
-    entity_id: z.string(),
-    priority: z.enum(["high", "medium", "low"]).optional().default("medium"),
-    notes: z.string().optional()
-});
-const ScheduleActivitySchema = z.object({
-    entity_type: z.enum(["candidate", "contact", "job"]),
-    entity_id: z.string(),
+const PersonEventSchema = z.object({
+    person_id: z.string().optional(),
+    job_id: z.string().optional(),
+    company_id: z.string().optional(),
     activity_type_id: z.string(),
-    scheduled_for: z.string(),
-    notes: z.string().optional()
+    notes: z.string().optional(),
+    created_at: z.string().optional(), // For scheduled events, set future datetime
 });
 const SearchSchema = z.object({
     query: z.string().optional(),
     company: z.string().optional(),
     title: z.string().optional(),
-    page: z.number().optional().default(1),
-    per_page: z.number().optional().default(10)
+    scroll_id: z.union([z.number(), z.string()]).optional(), // Accept both number and string
+    per_page: z.number().optional().default(20)
 });
+// Schema specifically for search-candidates tool arguments
+const SearchCandidatesSchema = z.object({
+    query: z.string().optional().describe("General Lucene search query. Use for specific field searches like past companies, skills, etc."),
+    company: z.string().optional().describe("Current company name to search for."),
+    title: z.string().optional().describe("Current job title to search for."),
+    scroll_id: z.string().optional().describe("Pagination scroll ID from previous search results."), // API expects string
+    per_page: z.number().int().optional().default(20).describe("Number of results per page (default 20, max typically 100 by Loxo)."),
+    person_global_status_id: z.number().int().optional().describe("Filter by person global status ID."),
+    person_type_id: z.number().int().optional().describe("Filter by person type ID."),
+    list_id: z.number().int().optional().describe("Filter by person list ID."),
+    include_related_agencies: z.boolean().optional().describe("Include results from related agencies.")
+});
+// Schema for search-companies tool
+const SearchCompaniesSchema = z.object({
+    query: z.string().optional().describe("Search query (Lucene syntax)."),
+    scroll_id: z.string().optional().describe("Cursor for pagination."),
+    company_type_id: z.number().int().optional().describe("Filter by company type ID."),
+    list_id: z.number().int().optional().describe("Filter by list ID."),
+    company_global_status_id: z.number().int().optional().describe("Filter by company global status ID.")
+});
+// Schema for get-company-details tool
+const GetCompanyDetailsSchema = z.object({
+    company_id: z.number().int().describe("The ID of the company to retrieve.")
+});
+// Schema for list-users tool
+const ListUsersSchema = z.object({}); // No specific input parameters
 const EntityIdSchema = z.object({
-    id: z.string()
+    id: z.string() // Represents person_id for these tools
 });
-const EntityNoteSchema = z.object({
-    entity_type: z.enum(["candidate", "job"]),
-    entity_id: z.string(),
-    content: z.string()
-});
-const LogActivitySchema = z.object({
-    entity_type: z.enum(["candidate", "job"]),
-    entity_id: z.string(),
-    activity_type_id: z.string(),
-    notes: z.string().optional()
+const PersonSubResourceIdSchema = z.object({
+    person_id: z.string(),
+    resource_id: z.string() // Represents job_profile_id or education_profile_id
 });
 // Create server instance
 const server = new Server({
@@ -92,124 +115,117 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "spark-search-activity-types",
-                description: "Get a list of activity types from Spark Search",
-                inputSchema: {
-                    type: "object",
-                    properties: {},
-                    required: [],
-                },
-            },
-            {
                 name: "get-todays-tasks",
-                description: "Get all tasks and scheduled activities for today",
-                inputSchema: {
-                    type: "object",
-                    properties: {},
-                    required: [],
-                }
-            },
-            {
-                name: "get-call-queue",
-                description: "Get the current call queue",
-                inputSchema: {
-                    type: "object",
-                    properties: {},
-                    required: [],
-                }
-            },
-            {
-                name: "add-to-call-queue",
-                description: "Add a candidate or contact to the call queue",
+                description: "Get all tasks and scheduled activities for today or a date range",
                 inputSchema: {
                     type: "object",
                     properties: {
-                        entity_type: {
-                            type: "string",
-                            description: "Type of entity (candidate or contact)",
-                            enum: ["candidate", "contact"]
+                        user_id: {
+                            type: "number",
+                            description: "Optional: Filter by user ID"
                         },
-                        entity_id: {
+                        start_date: {
                             type: "string",
-                            description: "ID of the candidate or contact"
+                            description: "Optional: Start date for filtering (ISO format)"
                         },
-                        priority: {
+                        end_date: {
                             type: "string",
-                            enum: ["high", "medium", "low"],
-                            default: "medium",
-                            description: "Priority level for the call"
+                            description: "Optional: End date for filtering (ISO format)"
                         },
-                        notes: {
+                        per_page: {
+                            type: "number",
+                            description: "Number of results per page"
+                        },
+                        scroll_id: {
                             type: "string",
-                            description: "Notes about why this call is needed"
+                            description: "Cursor for pagination"
                         }
                     },
-                    required: ["entity_type", "entity_id"]
+                    required: [],
                 }
             },
             {
                 name: "schedule-activity",
-                description: "Schedule a future activity (like a call or meeting)",
+                description: "Schedule a future activity (like a call or meeting) by creating a person event",
                 inputSchema: {
                     type: "object",
                     properties: {
-                        entity_type: {
+                        person_id: {
                             type: "string",
-                            description: "Type of entity (candidate, contact, job)",
-                            enum: ["candidate", "contact", "job"]
+                            description: "ID of the person (candidate) for this activity"
                         },
-                        entity_id: {
+                        job_id: {
                             type: "string",
-                            description: "ID of the entity"
+                            description: "Optional: ID of the job related to this activity"
+                        },
+                        company_id: {
+                            type: "string",
+                            description: "Optional: ID of the company related to this activity"
                         },
                         activity_type_id: {
                             type: "string",
                             description: "ID of the activity type"
                         },
-                        scheduled_for: {
+                        created_at: {
                             type: "string",
-                            description: "ISO datetime when the activity should occur"
+                            description: "ISO datetime when the activity should occur (future date/time for scheduled activities)"
                         },
                         notes: {
                             type: "string",
                             description: "Notes about the scheduled activity"
                         }
                     },
-                    required: ["entity_type", "entity_id", "activity_type_id", "scheduled_for"]
+                    required: ["activity_type_id", "created_at"]
                 }
             },
             {
                 name: "search-candidates",
-                description: "Search for candidates in Loxo with specific criteria",
+                description: "Search for candidates in Loxo. Use the 'query' field for complex Lucene queries, including searching past employment (e.g., 'job_profiles.company_name:\"Old Company\"'). The 'company' parameter targets current employment.",
                 inputSchema: {
                     type: "object",
                     properties: {
                         query: {
                             type: "string",
-                            description: "General search query (optional)"
+                            description: "General Lucene search query. Use for specific field searches like past companies, skills, etc. (optional)"
                         },
                         company: {
                             type: "string",
-                            description: "Company name to search for (optional)"
+                            description: "Current company name to search for (optional)"
                         },
                         title: {
                             type: "string",
-                            description: "Job title to search for (optional)"
+                            description: "Current job title to search for (optional)"
                         },
-                        page: {
-                            type: "number",
-                            description: "Page number for pagination"
+                        scroll_id: {
+                            type: "string", // OpenAPI spec says string for scroll_id
+                            description: "Pagination scroll ID from previous search results."
                         },
                         per_page: {
                             type: "number",
-                            description: "Number of results per page"
+                            description: "Number of results per page (default 20, max typically 100 by Loxo)."
+                        },
+                        person_global_status_id: {
+                            type: "integer",
+                            description: "Filter by person global status ID."
+                        },
+                        person_type_id: {
+                            type: "integer",
+                            description: "Filter by person type ID."
+                        },
+                        list_id: {
+                            type: "integer",
+                            description: "Filter by person list ID."
+                        },
+                        include_related_agencies: {
+                            type: "boolean",
+                            description: "Include results from related agencies."
                         }
                     }
                 }
             },
             {
                 name: "get-candidate",
-                description: "Get detailed information about a specific candidate",
+                description: "Get detailed information from a candidate's main profile. This may include summaries or full lists of job/education profiles. For guaranteed complete lists and then full details of each item, use list-person-job-profiles, get-person-job-profile-detail, etc., and similarly for education, emails, and phones.",
                 inputSchema: {
                     type: "object",
                     properties: {
@@ -222,25 +238,92 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
+                name: "get-person-emails",
+                description: "Get all email addresses for a specific person.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        id: { type: "string", description: "The ID of the person." } // Reusing 'id' from EntityIdSchema
+                    },
+                    required: ["id"],
+                },
+            },
+            {
+                name: "get-person-phones",
+                description: "Get all phone numbers for a specific person.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        id: { type: "string", description: "The ID of the person." }
+                    },
+                    required: ["id"],
+                },
+            },
+            {
+                name: "list-person-job-profiles",
+                description: "Lists job profiles (work history summaries/IDs) for a person. Use get-person-job-profile-detail for full details of each.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        id: { type: "string", description: "The ID of the person." }
+                    },
+                    required: ["id"],
+                }
+            },
+            {
+                name: "get-person-job-profile-detail",
+                description: "Get full details for a specific job profile (work history item) of a person.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        person_id: { type: "string", description: "The ID of the person." },
+                        resource_id: { type: "string", description: "The ID of the job profile." }
+                    },
+                    required: ["person_id", "resource_id"],
+                }
+            },
+            {
+                name: "list-person-education-profiles",
+                description: "Lists education profiles (summaries/IDs) for a person. Use get-person-education-profile-detail for full details of each.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        id: { type: "string", description: "The ID of the person." }
+                    },
+                    required: ["id"],
+                }
+            },
+            {
+                name: "get-person-education-profile-detail",
+                description: "Get full details for a specific education profile item of a person.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        person_id: { type: "string", description: "The ID of the person." },
+                        resource_id: { type: "string", description: "The ID of the education profile." }
+                    },
+                    required: ["person_id", "resource_id"],
+                }
+            },
+            {
                 name: "search-jobs",
-                description: "Search for jobs in Loxo",
+                description: "Search for jobs in Loxo using page-based pagination",
                 inputSchema: {
                     type: "object",
                     properties: {
                         query: {
                             type: "string",
-                            description: "Search query for jobs"
+                            description: "Search query for jobs (Lucene syntax supported)"
                         },
                         page: {
                             type: "number",
-                            description: "Page number for pagination"
+                            description: "Page number for pagination (starting at 1)"
                         },
                         per_page: {
                             type: "number",
                             description: "Number of results per page"
                         }
-                    },
-                    required: ["query"]
+                    }
                 }
             },
             {
@@ -258,42 +341,22 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "add-note",
-                description: "Add a note to a candidate or job",
-                inputSchema: {
-                    type: "object",
-                    properties: {
-                        entity_type: {
-                            type: "string",
-                            description: "Type of entity (candidate or job)",
-                            enum: ["candidate", "job"]
-                        },
-                        entity_id: {
-                            type: "string",
-                            description: "ID of the entity"
-                        },
-                        content: {
-                            type: "string",
-                            description: "Content of the note"
-                        }
-                    },
-                    required: ["entity_type", "entity_id", "content"]
-                }
-            },
-            {
                 name: "log-activity",
-                description: "Log an activity for a candidate or job",
+                description: "Log a completed activity by creating a person event (logged with current timestamp)",
                 inputSchema: {
                     type: "object",
                     properties: {
-                        entity_type: {
+                        person_id: {
                             type: "string",
-                            description: "Type of entity (candidate or job)",
-                            enum: ["candidate", "job"]
+                            description: "ID of the person (candidate) for this activity"
                         },
-                        entity_id: {
+                        job_id: {
                             type: "string",
-                            description: "ID of the entity"
+                            description: "Optional: ID of the job related to this activity"
+                        },
+                        company_id: {
+                            type: "string",
+                            description: "Optional: ID of the company related to this activity"
                         },
                         activity_type_id: {
                             type: "string",
@@ -301,18 +364,53 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         },
                         notes: {
                             type: "string",
-                            description: "Notes about the activity"
+                            description: "Notes about the completed activity"
                         }
                     },
-                    required: ["entity_type", "entity_id", "activity_type_id"]
+                    required: ["activity_type_id"]
                 }
+            },
+            {
+                name: "search-companies",
+                description: "Search for companies in Loxo.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        query: { type: "string", description: "Search query (Lucene syntax)." },
+                        scroll_id: { type: "string", description: "Cursor for pagination." },
+                        company_type_id: { type: "integer", description: "Filter by company type ID." },
+                        list_id: { type: "integer", description: "Filter by list ID." },
+                        company_global_status_id: { type: "integer", description: "Filter by company global status ID." }
+                    },
+                    required: [],
+                },
+            },
+            {
+                name: "get-company-details",
+                description: "Get detailed information about a specific company.",
+                inputSchema: {
+                    type: "object",
+                    properties: {
+                        company_id: { type: "integer", description: "The ID of the company to retrieve." }
+                    },
+                    required: ["company_id"],
+                },
+            },
+            {
+                name: "list-users",
+                description: "Get a list of users in the Loxo agency.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: [],
+                },
             }
         ]
     };
 });
 // Handle tool execution
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const { name, arguments: args } = request.params;
+    const { name, arguments: args = {} } = request.params;
     try {
         switch (name) {
             case "get-activity-types": {
@@ -322,37 +420,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "get-todays-tasks": {
-                // Get today's date in YYYY-MM-DD format
-                const today = new Date().toISOString().split('T')[0];
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/activities/scheduled?date=${today}`);
-                return {
-                    content: [{
-                            type: "text",
-                            text: JSON.stringify(response, null, 2)
-                        }]
-                };
-            }
-            case "get-call-queue": {
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/call-queue`);
-                return {
-                    content: [{
-                            type: "text",
-                            text: JSON.stringify(response, null, 2)
-                        }]
-                };
-            }
-            case "add-to-call-queue": {
-                const { entity_type, entity_id, priority, notes } = CallQueueSchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/call-queue`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        entity_type,
-                        entity_id,
-                        priority,
-                        notes
-                    })
-                });
+                const { user_id, start_date, end_date, per_page, scroll_id } = args;
+                let searchParams = new URLSearchParams();
+                if (user_id)
+                    searchParams.append('user_id', user_id.toString());
+                if (start_date)
+                    searchParams.append('start_date', start_date);
+                if (end_date)
+                    searchParams.append('end_date', end_date);
+                if (per_page)
+                    searchParams.append('per_page', per_page.toString());
+                if (scroll_id)
+                    searchParams.append('scroll_id', scroll_id);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/schedule_items?${searchParams.toString()}`);
                 return {
                     content: [{
                             type: "text",
@@ -361,15 +441,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "schedule-activity": {
-                const { entity_type, entity_id, activity_type_id, scheduled_for, notes } = ScheduleActivitySchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/${entity_type}s/${entity_id}/activities`, {
+                const { person_id, job_id, company_id, activity_type_id, created_at, notes } = PersonEventSchema.parse(args);
+                const formData = new URLSearchParams();
+                if (person_id)
+                    formData.append('person_event[person_id]', person_id);
+                if (job_id)
+                    formData.append('person_event[job_id]', job_id);
+                if (company_id)
+                    formData.append('person_event[company_id]', company_id);
+                formData.append('person_event[activity_type_id]', activity_type_id);
+                if (created_at)
+                    formData.append('person_event[created_at]', created_at);
+                if (notes)
+                    formData.append('person_event[notes]', notes);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/person_events`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        activity_type_id,
-                        scheduled_for,
-                        notes
-                    })
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
                 });
                 return {
                     content: [{
@@ -379,40 +467,70 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "search-candidates": {
-                const { query, company, title, page, per_page } = SearchSchema.parse(args);
-                // Build search query
+                const { query, company, title, scroll_id, per_page, person_global_status_id, person_type_id, list_id, include_related_agencies } = SearchCandidatesSchema.parse(args); // Use the new specific schema
                 let searchParams = new URLSearchParams();
-                if (page)
-                    searchParams.append('page', page.toString());
                 if (per_page)
                     searchParams.append('per_page', per_page.toString());
-                // Construct advanced search query
-                let searchQuery = [];
-                if (query)
-                    searchQuery.push(query);
-                if (company)
-                    searchQuery.push(`company:"${company}"`);
-                if (title)
-                    searchQuery.push(`title:"${title}"`);
-                // Combine search terms
-                const finalQuery = searchQuery.join(' AND ');
-                searchParams.append('q', finalQuery || '*'); // Use * as default if no query terms
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/search?${searchParams.toString()}`);
-                // Format response to highlight relevant job profile matches
-                const formattedResponse = {
-                    ...response,
-                    results: response.results?.map((candidate) => ({
-                        ...candidate,
-                        matching_profiles: candidate.job_profiles?.filter((profile) => (!company || profile.company?.name?.toLowerCase().includes(company.toLowerCase())) &&
-                            (!title || profile.title?.toLowerCase().includes(title.toLowerCase())))
-                    }))
-                };
-                return {
-                    content: [{
-                            type: "text",
-                            text: JSON.stringify(formattedResponse, null, 2)
-                        }]
-                };
+                if (scroll_id)
+                    searchParams.append('scroll_id', scroll_id); // scroll_id is already string from schema
+                if (person_global_status_id)
+                    searchParams.append('person_global_status_id', person_global_status_id.toString());
+                if (person_type_id)
+                    searchParams.append('person_type_id', person_type_id.toString());
+                if (list_id)
+                    searchParams.append('list_id', list_id.toString());
+                if (include_related_agencies !== undefined)
+                    searchParams.append('include_related_agencies', include_related_agencies.toString());
+                let constructedQueryParts = [];
+                if (query) { // User-provided base query
+                    constructedQueryParts.push(`(${query})`);
+                }
+                if (company) { // Specific field for current company if Loxo supports it, otherwise part of general query
+                    // Assuming 'current_company_name_text' or similar. This is speculative.
+                    // If not known, this should be part of the general 'query' input by the user.
+                    // For now, let's keep it simple and assume it's part of the main query string or Loxo handles it.
+                    // A more robust solution would require knowing Loxo's exact Lucene schema.
+                    // Let's assume for now that if 'company' is provided, it's added to the general query.
+                    constructedQueryParts.push(`current_company_name_text:"${company}"`); // Example, might need adjustment
+                }
+                if (title) { // Similar for title
+                    constructedQueryParts.push(`current_title_text:"${title}"`); // Example
+                }
+                const finalQueryString = constructedQueryParts.length > 0 ? constructedQueryParts.join(' AND ') : (query ? query : '*:*');
+                searchParams.append('query', finalQueryString);
+                console.error('Final Search query for API:', finalQueryString);
+                try {
+                    const apiResponse = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people?${searchParams.toString()}`);
+                    const candidateResults = (apiResponse?.people || []).map((person) => ({
+                        id: person.id,
+                        name: person.name,
+                        current_title: person.current_title,
+                        current_company: person.current_company,
+                        location: person.location,
+                    }));
+                    const toolResponse = {
+                        results: candidateResults,
+                        scroll_id: apiResponse?.scroll_id || null,
+                        total_count: apiResponse?.total_count || 0,
+                    };
+                    return {
+                        content: [{
+                                type: "text",
+                                text: JSON.stringify(toolResponse, null, 2)
+                            }]
+                    };
+                }
+                catch (err) {
+                    const error = err;
+                    console.error('Search error:', error);
+                    return {
+                        content: [{
+                                type: "text",
+                                text: `Error searching candidates: ${error.message}`
+                            }],
+                        isError: true
+                    };
+                }
             }
             case "get-candidate": {
                 const { id } = EntityIdSchema.parse(args);
@@ -422,15 +540,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "search-jobs": {
-                const { query, page, per_page } = SearchSchema.parse(args);
+                const { query, per_page, page } = args;
                 // Build search params
                 let searchParams = new URLSearchParams();
-                if (page)
-                    searchParams.append('page', page.toString());
+                if (query)
+                    searchParams.append('query', query);
                 if (per_page)
                     searchParams.append('per_page', per_page.toString());
-                searchParams.append('q', query || '*'); // Use * as default if no query
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/search?${searchParams.toString()}`);
+                if (page)
+                    searchParams.append('page', page.toString());
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs?${searchParams.toString()}`);
                 return {
                     content: [{
                             type: "text",
@@ -445,27 +564,102 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "add-note": {
-                const { entity_type, entity_id, content } = EntityNoteSchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/${entity_type}s/${entity_id}/notes`, {
+            case "log-activity": {
+                const { person_id, job_id, company_id, activity_type_id, notes } = PersonEventSchema.parse(args);
+                const formData = new URLSearchParams();
+                if (person_id)
+                    formData.append('person_event[person_id]', person_id);
+                if (job_id)
+                    formData.append('person_event[job_id]', job_id);
+                if (company_id)
+                    formData.append('person_event[company_id]', company_id);
+                formData.append('person_event[activity_type_id]', activity_type_id);
+                if (notes)
+                    formData.append('person_event[notes]', notes);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/person_events`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ content })
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
                 });
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "log-activity": {
-                const { entity_type, entity_id, activity_type_id, notes } = LogActivitySchema.parse(args);
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/${entity_type}s/${entity_id}/activities`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        activity_type_id,
-                        notes
-                    })
-                });
+            case "search-companies": {
+                const { query, scroll_id, company_type_id, list_id, company_global_status_id } = SearchCompaniesSchema.parse(args);
+                let searchParams = new URLSearchParams();
+                if (query)
+                    searchParams.append('query', query);
+                if (scroll_id)
+                    searchParams.append('scroll_id', scroll_id);
+                if (company_type_id)
+                    searchParams.append('company_type_id', company_type_id.toString());
+                if (list_id)
+                    searchParams.append('list_id', list_id.toString());
+                if (company_global_status_id)
+                    searchParams.append('company_global_status_id', company_global_status_id.toString());
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/companies?${searchParams.toString()}`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "get-company-details": {
+                const { company_id } = GetCompanyDetailsSchema.parse(args);
+                const response = await makeRequest(// Assuming a single Company object is returned
+                `/${env.LOXO_AGENCY_SLUG}/companies/${company_id}`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "list-users": {
+                // ListUsersSchema is empty, so no args to parse specifically for it.
+                const response = await makeRequest(// Assuming a ListUsersResponse object
+                `/${env.LOXO_AGENCY_SLUG}/users`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "get-person-emails": {
+                const { id: person_id } = EntityIdSchema.parse(args); // 'id' from input is person_id
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/emails`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "get-person-phones": {
+                const { id: person_id } = EntityIdSchema.parse(args);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/phones`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "list-person-job-profiles": {
+                const { id: person_id } = EntityIdSchema.parse(args);
+                // Assuming this endpoint returns an array of full JobProfile objects for now.
+                // If it returns summaries/IDs, the response type <JobProfile[]> might need adjustment.
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "get-person-job-profile-detail": {
+                const { person_id, resource_id: job_profile_id } = PersonSubResourceIdSchema.parse(args);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles/${job_profile_id}`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "list-person-education-profiles": {
+                const { id: person_id } = EntityIdSchema.parse(args);
+                // Assuming this endpoint returns an array of full EducationProfile objects for now.
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles`);
+                return {
+                    content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+                };
+            }
+            case "get-person-education-profile-detail": {
+                const { person_id, resource_id: education_profile_id } = PersonSubResourceIdSchema.parse(args);
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles/${education_profile_id}`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
@@ -474,9 +668,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 throw new Error(`Unknown tool: ${name}`);
         }
     }
-    catch (error) {
-        console.error('Loxo API error:', error);
-        throw error;
+    catch (err) {
+        const error = err;
+        console.error(`Error executing tool ${name}:`, error);
+        return {
+            content: [{
+                    type: "text",
+                    text: `Error: ${error?.message || 'Unknown error occurred'}`
+                }],
+            isError: true
+        };
     }
 });
 // Start the server

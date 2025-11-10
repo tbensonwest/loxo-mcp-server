@@ -9,6 +9,7 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@api/loxo": "file:.api/apis/loxo",
     "@modelcontextprotocol/sdk": "latest",
     "dotenv": "latest",
     "zod": "latest"

@@ -1,2 +1,4 @@
 .env
 package-lock.json
+.api
+node_modules
