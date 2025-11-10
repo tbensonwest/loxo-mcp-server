@@ -332,6 +332,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
           required: [],
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_todays_tasks",
@@ -361,7 +367,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: [],
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_schedule_activity",
@@ -395,7 +407,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["activity_type_id", "created_at"]
-        }
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_search_candidates",
@@ -440,7 +458,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 description: "Include results from related agencies."
             }
           }
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_candidate",
@@ -454,7 +478,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["id"]
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_person_emails",
@@ -466,6 +496,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["id"],
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_person_phones",
@@ -473,9 +509,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string", description: "The ID of the person." } 
+            id: { type: "string", description: "The ID of the person." }
           },
           required: ["id"],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
         },
       },
       {
@@ -487,7 +529,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: { type: "string", description: "The ID of the person."}
           },
           required: ["id"],
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_person_job_profile_detail",
@@ -499,7 +547,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             resource_id: { type: "string", description: "The ID of the job profile." }
           },
           required: ["person_id", "resource_id"],
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_list_person_education_profiles",
@@ -510,7 +564,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: { type: "string", description: "The ID of the person." }
           },
           required: ["id"],
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_person_education_profile_detail",
@@ -522,7 +582,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             resource_id: { type: "string", description: "The ID of the education profile." }
           },
           required: ["person_id", "resource_id"],
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_search_jobs",
@@ -543,7 +609,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               description: "Number of results per page"
             }
           }
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_job",
@@ -557,7 +629,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["id"]
-        }
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_log_activity",
@@ -587,7 +665,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["activity_type_id"]
-        }
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_search_companies",
@@ -603,6 +687,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: [],
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_get_company_details",
@@ -614,6 +704,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["company_id"],
         },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
       },
       {
         name: "loxo_list_users",
@@ -622,6 +718,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {},
           required: [],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
         },
       }
     ]
