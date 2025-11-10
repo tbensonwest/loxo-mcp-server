@@ -229,6 +229,36 @@ interface SearchCandidatesToolResponse {
     // Add other response fields like total_count, etc.
   }
 
+// Helper function to create actionable error messages
+function formatApiError(status: number, statusText: string, responseBody: string, endpoint: string): string {
+  switch (status) {
+    case 401:
+      return `Authentication failed: Invalid or expired API key.\n\nNext steps:\n1. Verify your LOXO_API_KEY in .env is correct\n2. Check if your API key has expired in Loxo settings\n3. Ensure you have API access enabled for your account`;
+
+    case 403:
+      return `Access forbidden: You don't have permission to access this resource.\n\nNext steps:\n1. Verify your API key has the required permissions\n2. Check if this endpoint requires specific user roles\n3. Contact your Loxo administrator if you need elevated access`;
+
+    case 404:
+      const idMatch = endpoint.match(/\/(\d+|[a-f0-9-]{36})(?:\/|$)/);
+      const id = idMatch ? idMatch[1] : 'specified';
+      return `Resource not found: The ${id} ID does not exist.\n\nNext steps:\n1. Verify the ID is correct\n2. Check if the resource was deleted\n3. Use search tools to find the correct ID`;
+
+    case 422:
+      return `Invalid request: The provided data is invalid.\n\nDetails: ${responseBody}\n\nNext steps:\n1. Check required fields are provided\n2. Verify field formats (dates as ISO strings, IDs as strings/integers)\n3. Review tool parameter requirements`;
+
+    case 429:
+      return `Rate limit exceeded: Too many requests.\n\nNext steps:\n1. Wait a few moments before retrying\n2. Reduce request frequency\n3. Contact Loxo support to increase your rate limit`;
+
+    case 500:
+    case 502:
+    case 503:
+      return `Loxo API server error (${status}): The Loxo service is experiencing issues.\n\nNext steps:\n1. Wait a few minutes and retry\n2. Check Loxo service status\n3. If issue persists, contact Loxo support`;
+
+    default:
+      return `API request failed (${status}): ${statusText}\n\nNext steps:\n1. Review the error details above\n2. Verify your request parameters\n3. Check Loxo API documentation for this endpoint`;
+  }
+}
+
 // Helper function for API calls
 async function makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${LOXO_API_BASE}${endpoint}`;
@@ -241,29 +271,48 @@ async function makeRequest<T>(endpoint: string, options: RequestInit = {}): Prom
     try {
         const response = await fetch(url, { ...options, headers });
         const responseText = await response.text();
-        
+
         if (!response.ok) {
             console.error('API Response:', {
                 status: response.status,
                 statusText: response.statusText,
                 body: responseText
             });
-            throw new Error(`API request failed: ${response.status} ${response.statusText}\nResponse: ${responseText}`);
+
+            // Throw actionable error message
+            const errorMessage = formatApiError(response.status, response.statusText, responseText, endpoint);
+            throw new Error(errorMessage);
         }
 
         // Only try to parse as JSON if we have content
         return responseText ? JSON.parse(responseText) : null;
     } catch (error) {
-        console.error('API request error:', error);
+        // If it's already our formatted error, re-throw it
+        if (error instanceof Error && error.message.includes('Next steps:')) {
+            throw error;
+        }
+
+        // Handle network errors and other issues
+        if (error instanceof Error) {
+            if (error.message.includes('fetch')) {
+                throw new Error(`Network error: Unable to connect to Loxo API.\n\nNext steps:\n1. Check your internet connection\n2. Verify LOXO_DOMAIN is correct in .env (current: ${env.LOXO_DOMAIN})\n3. Check if Loxo API is accessible from your network`);
+            }
+
+            if (error.message.includes('JSON')) {
+                throw new Error(`Invalid response: Loxo API returned malformed data.\n\nNext steps:\n1. Retry the request\n2. Check if the endpoint is correct\n3. Contact Loxo support if issue persists`);
+            }
+        }
+
+        // Log internal details but don't expose them to user
+        console.error('Unexpected error:', error);
         console.error('Request details:', {
-            url,
-            headers: {
-                ...headers,
-                authorization: '[REDACTED]' // Don't log the full token
-            },
-            method: options.method || 'GET'
+            endpoint,
+            method: options.method || 'GET',
+            hasBody: !!options.body
         });
-        throw error;
+
+        // Generic fallback error
+        throw new Error(`Unexpected error occurred.\n\nNext steps:\n1. Retry the request\n2. Check your parameters are valid\n3. Review logs for technical details`);
     }
 }
 
@@ -1170,14 +1219,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   } catch (err) {
     const error = err as Error;
     console.error(`Error executing tool ${name}:`, error);
-        return {
-            content: [{ 
-                type: "text", 
-                text: `Error: ${error?.message || 'Unknown error occurred'}` 
-            }],
-            isError: true
-        };
+
+    // Handle Zod validation errors with actionable messages
+    if (error.name === 'ZodError' || error.message.includes('Zod')) {
+      return {
+        content: [{
+          type: "text",
+          text: `Parameter validation failed: ${error.message}\n\nNext steps:\n1. Check all required parameters are provided\n2. Verify parameter types match the schema\n3. Review tool documentation for parameter requirements`
+        }],
+        isError: true
+      };
     }
+
+    // Pass through our formatted error messages or provide generic fallback
+    return {
+      content: [{
+        type: "text",
+        text: error?.message || 'Unknown error occurred\n\nNext steps:\n1. Retry the request\n2. Check your parameters\n3. Review logs for details'
+      }],
+      isError: true
+    };
+  }
 });
 
 // Start the server
