@@ -7,6 +7,29 @@ import { validateEnv } from './config.js';
 const env = validateEnv();
 // Construct API base URL using domain from config
 const LOXO_API_BASE = `https://${env.LOXO_DOMAIN}/api`;
+// MCP Best Practice: Character limit for responses to prevent overwhelming context
+const CHARACTER_LIMIT = 25000;
+// Helper function to truncate responses with clear messaging
+function truncateResponse(content, limit = CHARACTER_LIMIT) {
+    if (content.length <= limit) {
+        return { text: content, wasTruncated: false };
+    }
+    const truncated = content.substring(0, limit);
+    const message = `\n\n[Response truncated at ${limit} characters. Original length: ${content.length} characters. Use filtering parameters to reduce result size.]`;
+    return {
+        text: truncated + message,
+        wasTruncated: true
+    };
+}
+// Helper function to format responses based on format preference
+function formatResponse(data, format = 'json') {
+    if (format === 'markdown') {
+        // For now, return JSON wrapped in markdown code block
+        // Future enhancement: convert to proper markdown tables/lists
+        return '```json\n' + JSON.stringify(data, null, 2) + '\n```';
+    }
+    return JSON.stringify(data, null, 2);
+}
 // Helper function for API calls
 async function makeRequest(endpoint, options = {}) {
     const url = `${LOXO_API_BASE}${endpoint}`;
@@ -237,6 +260,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         include_related_agencies: {
                             type: "boolean",
                             description: "Include results from related agencies."
+                        },
+                        response_format: {
+                            type: "string",
+                            enum: ["json", "markdown"],
+                            description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
                         }
                     }
                 },
@@ -569,7 +597,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 };
             }
             case "loxo_search_candidates": {
-                const { query, company, title, scroll_id, per_page, person_global_status_id, person_type_id, list_id, include_related_agencies } = SearchCandidatesSchema.parse(args); // Use the new specific schema
+                const { query, company, title, scroll_id, per_page, person_global_status_id, person_type_id, list_id, include_related_agencies, response_format = 'json' } = args;
                 let searchParams = new URLSearchParams();
                 if (per_page)
                     searchParams.append('per_page', per_page.toString());
@@ -615,10 +643,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         scroll_id: apiResponse?.scroll_id || null,
                         total_count: apiResponse?.total_count || 0,
                     };
+                    // Format and truncate response
+                    const formatted = formatResponse(toolResponse, response_format);
+                    const { text } = truncateResponse(formatted);
                     return {
                         content: [{
                                 type: "text",
-                                text: JSON.stringify(toolResponse, null, 2)
+                                text
                             }]
                     };
                 }
