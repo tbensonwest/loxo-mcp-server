@@ -73,6 +73,16 @@ interface SearchCompaniesResponse {
     companies: Company[];
 }
 
+interface SearchCompaniesToolResponse {
+    results: Company[];
+    pagination: {
+        scroll_id: string | null;
+        has_more: boolean;
+        total_count: number;
+        returned_count: number;
+    };
+}
+
 // Interface for User (simplified)
 interface User {
     id: number;
@@ -220,8 +230,12 @@ interface CandidateSearchResult {
 
 interface SearchCandidatesToolResponse {
     results: CandidateSearchResult[];
-    scroll_id: string | null;
-    total_count: number;
+    pagination: {
+        scroll_id: string | null;
+        has_more: boolean;
+        total_count: number;
+        returned_count: number;
+    };
 }
   
   interface SearchResponse {
@@ -910,10 +924,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (per_page) searchParams.append('per_page', per_page.toString());
         if (scroll_id) searchParams.append('scroll_id', scroll_id);
 
-        const response = await makeRequest(
+        const apiResponse: any = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/schedule_items?${searchParams.toString()}`
         );
-        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+
+        // Structure response with pagination metadata
+        const items = apiResponse?.schedule_items || apiResponse?.items || apiResponse || [];
+        const toolResponse = {
+          results: items,
+          pagination: {
+            scroll_id: apiResponse?.scroll_id || null,
+            has_more: !!(apiResponse?.scroll_id),
+            total_count: apiResponse?.total_count || 0,
+            returned_count: Array.isArray(items) ? items.length : 0
+          }
+        };
+
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
         const { text } = truncateResponse(formatted);
         return {
           content: [{
@@ -1008,8 +1035,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             
             const toolResponse: SearchCandidatesToolResponse = {
                 results: candidateResults,
-                scroll_id: apiResponse?.scroll_id || null,
-                total_count: apiResponse?.total_count || 0,
+                pagination: {
+                    scroll_id: apiResponse?.scroll_id || null,
+                    has_more: !!(apiResponse?.scroll_id),
+                    total_count: apiResponse?.total_count || 0,
+                    returned_count: candidateResults.length
+                }
             };
 
             // Format and truncate response
@@ -1046,19 +1077,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_search_jobs": {
-        const { query, per_page, page, response_format = 'json' } = args as any;
+        const { query, per_page, page = 1, response_format = 'json' } = args as any;
 
         // Build search params
         let searchParams = new URLSearchParams();
         if (query) searchParams.append('query', query);
         if (per_page) searchParams.append('per_page', per_page.toString());
-        if (page) searchParams.append('page', page.toString());
+        searchParams.append('page', page.toString());
 
-        const response = await makeRequest(
+        const apiResponse: any = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/jobs?${searchParams.toString()}`
         );
 
-        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        // Structure response with pagination metadata
+        const jobs = apiResponse?.jobs || apiResponse || [];
+        const totalCount = apiResponse?.total_count || 0;
+        const returnedCount = Array.isArray(jobs) ? jobs.length : 0;
+        const perPageValue = per_page || 20;
+        const currentPage = page;
+        const totalPages = totalCount > 0 ? Math.ceil(totalCount / perPageValue) : 1;
+
+        const toolResponse = {
+          results: jobs,
+          pagination: {
+            page: currentPage,
+            per_page: perPageValue,
+            total_pages: totalPages,
+            total_count: totalCount,
+            returned_count: returnedCount,
+            has_more: currentPage < totalPages,
+            next_page: currentPage < totalPages ? currentPage + 1 : null
+          }
+        };
+
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
         const { text } = truncateResponse(formatted);
 
         return {
@@ -1119,10 +1171,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (list_id) searchParams.append('list_id', list_id.toString());
         if (company_global_status_id) searchParams.append('company_global_status_id', company_global_status_id.toString());
 
-        const response = await makeRequest<SearchCompaniesResponse>(
+        const apiResponse = await makeRequest<SearchCompaniesResponse>(
           `/${env.LOXO_AGENCY_SLUG}/companies?${searchParams.toString()}`
         );
-        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+
+        const toolResponse: SearchCompaniesToolResponse = {
+          results: apiResponse?.companies || [],
+          pagination: {
+            scroll_id: apiResponse?.scroll_id || null,
+            has_more: !!(apiResponse?.scroll_id),
+            total_count: apiResponse?.total_count || 0,
+            returned_count: apiResponse?.companies?.length || 0
+          }
+        };
+
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
         const { text } = truncateResponse(formatted);
         return {
           content: [{ type: "text", text }]
