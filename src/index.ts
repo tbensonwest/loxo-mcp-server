@@ -354,7 +354,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "loxo_get_activity_types",
-        description: "Get a list of activity types from Loxo",
+        description: "Get a list of all available activity types in Loxo (e.g., calls, meetings, interviews). Use this before scheduling or logging activities to find the correct activity_type_id. Example: Call this first to get activity type IDs, then use loxo_schedule_activity with the correct ID.",
         inputSchema: {
           type: "object",
           properties: {
@@ -375,7 +375,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_todays_tasks",
-        description: "Get all tasks and scheduled activities for today or a date range",
+        description: "Get scheduled items (tasks, calls, meetings) for a date range. Uses cursor-based pagination with scroll_id. Examples: (1) Get today's tasks: omit all parameters. (2) Get tasks for specific user: provide user_id. (3) Get tasks for date range: provide start_date and end_date in ISO format (YYYY-MM-DD). Combine parameters to filter by user and date range.",
         inputSchema: {
           type: "object",
           properties: {
@@ -416,7 +416,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_schedule_activity",
-        description: "Schedule a future activity (like a call or meeting) by creating a person event",
+        description: "Schedule a future activity (call, meeting, interview) with a candidate. Use loxo_get_activity_types first to get the correct activity_type_id. Example: Schedule a call tomorrow at 2pm - set created_at to future ISO datetime (2024-01-15T14:00:00Z), provide person_id, activity_type_id for 'call', and notes. Optionally link to a job_id or company_id.",
         inputSchema: {
           type: "object",
           properties: {
@@ -456,7 +456,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_search_candidates",
-        description: "Search for candidates in Loxo. Use the 'query' field for complex Lucene queries, including searching past employment (e.g., 'job_profiles.company_name:\"Old Company\"'). The 'company' parameter targets current employment.",
+        description: "Search for candidates using Lucene query syntax. Uses cursor-based pagination with scroll_id. Lucene examples: (1) Past employer: query='job_profiles.company_name:\"Google\"' (2) Skills: query='skillsets:\"Python\"' (3) Combined: query='job_profiles.company_name:\"Microsoft\" AND skillsets:\"Java\"' (4) Current role: company='Acme Corp' and title='Engineer'. Parameters can be combined. Use scroll_id from response for next page. Returns: id, name, current_title, current_company, location.",
         inputSchema: {
           type: "object",
           properties: {
@@ -512,7 +512,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_candidate",
-        description: "Get detailed information from a candidate's main profile. This may include summaries or full lists of job/education profiles. For guaranteed complete lists and then full details of each item, use list-person-job-profiles, get-person-job-profile-detail, etc., and similarly for education, emails, and phones.",
+        description: "Get complete candidate profile including bio, location, current role, skills, tags, compensation, and embedded lists of jobs/education/emails/phones. Use this for overview. For guaranteed complete contact info or work history, use dedicated tools: loxo_get_person_emails, loxo_get_person_phones, loxo_list_person_job_profiles, loxo_list_person_education_profiles. Example: After searching candidates, use their ID here to get full details.",
         inputSchema: {
           type: "object",
           properties: {
@@ -537,7 +537,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_person_emails",
-        description: "Get all email addresses for a specific person.",
+        description: "Get all email addresses for a candidate with type information (work, personal, etc.). Use when you need guaranteed complete email list or when candidate profile doesn't include emails. Example: After finding a candidate, use their ID to get all email addresses for outreach.",
         inputSchema: {
           type: "object",
           properties: {
@@ -559,7 +559,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_person_phones",
-        description: "Get all phone numbers for a specific person.",
+        description: "Get all phone numbers for a candidate with type information (mobile, work, home, etc.). Use when you need guaranteed complete phone list or when candidate profile doesn't include phones. Example: After finding a candidate, use their ID to get all phone numbers for calling.",
         inputSchema: {
           type: "object",
           properties: {
@@ -581,7 +581,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_list_person_job_profiles",
-        description: "Lists job profiles (work history summaries/IDs) for a person. Use get-person-job-profile-detail for full details of each.",
+        description: "Get complete work history for a candidate (all job profiles with company, title, dates, descriptions). Returns list of all positions. Use loxo_get_person_job_profile_detail for additional details of a specific position if needed. Example: After finding a candidate with Google experience, get their full work history to see all roles and tenure.",
         inputSchema: {
           type: "object",
           properties: {
@@ -603,7 +603,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_person_job_profile_detail",
-        description: "Get full details for a specific job profile (work history item) of a person.",
+        description: "Get detailed information about a specific position in a candidate's work history. Use after loxo_list_person_job_profiles to get additional details for a particular job. Requires both person_id and resource_id (job profile ID from list response). Example: Candidate worked at 3 companies, get details of their Google role specifically.",
         inputSchema: {
           type: "object",
           properties: {
@@ -626,7 +626,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_list_person_education_profiles",
-        description: "Lists education profiles (summaries/IDs) for a person. Use get-person-education-profile-detail for full details of each.",
+        description: "Get complete education history for a candidate (degrees, schools, graduation dates, descriptions). Returns list of all education entries. Use loxo_get_person_education_profile_detail for additional details if needed. Example: Check if candidate has required degree or attended target schools.",
         inputSchema: {
           type: "object",
           properties: {
@@ -648,7 +648,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_person_education_profile_detail",
-        description: "Get full details for a specific education profile item of a person.",
+        description: "Get detailed information about a specific education entry in a candidate's profile. Use after loxo_list_person_education_profiles to get additional details. Requires both person_id and resource_id (education profile ID from list response). Example: Candidate has multiple degrees, get details of their Stanford MBA specifically.",
         inputSchema: {
           type: "object",
           properties: {
@@ -671,7 +671,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_search_jobs",
-        description: "Search for jobs in Loxo using page-based pagination",
+        description: "Search for jobs using Lucene query syntax. Uses page-based pagination (NOT scroll_id like candidates). Lucene examples: (1) Title: query='title:\"Senior Engineer\"' (2) Location: query='location:\"Remote\"' (3) Combined: query='title:\"Engineer\" AND location:\"San Francisco\"'. Use page parameter for pagination (starts at 1). Returns job listings with key details. Example: Find all remote senior positions to match with candidates.",
         inputSchema: {
           type: "object",
           properties: {
@@ -703,7 +703,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_job",
-        description: "Get detailed information about a specific job",
+        description: "Get complete job details including description, requirements, compensation, status, hiring team, and related contacts. Use after searching jobs to get full posting details. Example: After finding relevant jobs via search, get full details to assess candidate fit or share with candidate.",
         inputSchema: {
           type: "object",
           properties: {
@@ -728,7 +728,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_log_activity",
-        description: "Log a completed activity by creating a person event (logged with current timestamp)",
+        description: "Log a completed activity (call, email, interview) that already happened. Uses current timestamp automatically. Use loxo_get_activity_types first to get correct activity_type_id. Example: Just finished phone screen with candidate - log it with activity_type_id for 'phone screen', person_id, and notes about the conversation. Optionally link to job_id or company_id.",
         inputSchema: {
           type: "object",
           properties: {
@@ -764,7 +764,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_search_companies",
-        description: "Search for companies in Loxo.",
+        description: "Search for companies using Lucene query syntax. Uses cursor-based pagination with scroll_id. Lucene examples: (1) Name: query='name:\"Acme*\"' (wildcard search) (2) Combine with filters: query + company_type_id or company_global_status_id. Use scroll_id from response for next page. Example: Find all tech companies in your database to source candidates from target employers.",
         inputSchema: {
           type: "object",
           properties: {
@@ -790,7 +790,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_company_details",
-        description: "Get detailed information about a specific company.",
+        description: "Get complete company profile including description, contacts, relationships, and status. Use after searching companies to get full details. Requires company_id (integer). Example: After finding target companies via search, get full details to understand hiring contacts and company background for candidate sourcing.",
         inputSchema: {
           type: "object",
           properties: {
@@ -812,7 +812,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_list_users",
-        description: "Get a list of users in the Loxo agency.",
+        description: "Get all users in your Loxo agency (recruiters, coordinators, etc.) with names and emails. Use this to find user_id values for filtering scheduled tasks or assigning ownership. Example: Get all recruiters to see who owns which candidates or to filter tasks by specific team member.",
         inputSchema: {
           type: "object",
           properties: {
