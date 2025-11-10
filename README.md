@@ -4,6 +4,8 @@ A Model Context Protocol (MCP) server that provides tools for interacting with t
 
 ## Installation
 
+### Option 1: Local Installation
+
 ```bash
 # Clone the repository
 git clone [repository-url]
@@ -14,6 +16,20 @@ npm install
 
 # Build the project
 npm run build
+```
+
+### Option 2: Docker Installation
+
+```bash
+# Clone the repository
+git clone [repository-url]
+cd loxo-mcp-server
+
+# Build the Docker image
+docker build -t loxo-mcp-server .
+
+# Or use Docker Compose
+docker-compose build
 ```
 
 ## Configuration
@@ -36,6 +52,90 @@ Required environment variables:
 - `LOXO_API_KEY`: Your Loxo API key
 - `LOXO_AGENCY_SLUG`: Your agency's slug in Loxo
 - `LOXO_DOMAIN`: (Optional) Defaults to 'app.loxo.co'
+
+### Docker Configuration
+
+When using Docker, environment variables are automatically loaded from your `.env` file via Docker Compose, or can be passed directly:
+
+**Using Docker Compose** (recommended):
+```bash
+# Ensure your .env file is configured
+docker-compose up
+```
+
+**Using Docker directly**:
+```bash
+docker run -i \
+  -e LOXO_API_KEY=your_api_key \
+  -e LOXO_AGENCY_SLUG=your_agency_slug \
+  -e LOXO_DOMAIN=app.loxo.co \
+  loxo-mcp-server
+```
+
+**Note**: The `-i` flag is required because MCP servers communicate over stdin/stdout.
+
+## Usage
+
+### Running the Server
+
+**Locally**:
+```bash
+npm start
+```
+
+**With Docker Compose**:
+```bash
+docker-compose up
+```
+
+**With Docker directly**:
+```bash
+docker run -i \
+  -e LOXO_API_KEY=your_api_key \
+  -e LOXO_AGENCY_SLUG=your_agency_slug \
+  loxo-mcp-server
+```
+
+### Integrating with Claude Desktop
+
+Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+**Local installation**:
+```json
+{
+  "mcpServers": {
+    "loxo": {
+      "command": "node",
+      "args": ["/path/to/loxo-mcp-server/build/index.js"],
+      "env": {
+        "LOXO_API_KEY": "your_api_key",
+        "LOXO_AGENCY_SLUG": "your_agency_slug",
+        "LOXO_DOMAIN": "app.loxo.co"
+      }
+    }
+  }
+}
+```
+
+**Docker installation**:
+```json
+{
+  "mcpServers": {
+    "loxo": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "LOXO_API_KEY=your_api_key",
+        "-e", "LOXO_AGENCY_SLUG=your_agency_slug",
+        "-e", "LOXO_DOMAIN=app.loxo.co",
+        "loxo-mcp-server"
+      ]
+    }
+  }
+}
+```
 
 ## Usage Examples
 
@@ -200,6 +300,8 @@ The server provides the following tools for AI assistants:
 
 ## Development
 
+### Local Development
+
 ```bash
 # Run in development mode with watch mode
 npm run dev
@@ -209,6 +311,25 @@ npm run build
 
 # Start the server
 npm start
+```
+
+### Docker Development
+
+```bash
+# Rebuild after code changes
+docker-compose build
+
+# Run with live logs
+docker-compose up
+
+# Run in detached mode
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the container
+docker-compose down
 ```
 
 ## Type Safety

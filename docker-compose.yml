@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  loxo-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - LOXO_API_KEY=${LOXO_API_KEY}
+      - LOXO_DOMAIN=${LOXO_DOMAIN:-app.loxo.co}
+      - LOXO_AGENCY_SLUG=${LOXO_AGENCY_SLUG}
+    stdin_open: true
+    tty: true
+    # MCP servers communicate via stdio, so we use interactive mode
+    command: ["node", "build/index.js"]
