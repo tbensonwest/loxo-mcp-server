@@ -106,7 +106,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
         tools: [
             {
-                name: "get-activity-types",
+                name: "loxo_get_activity_types",
                 description: "Get a list of activity types from Loxo",
                 inputSchema: {
                     type: "object",
@@ -115,7 +115,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "get-todays-tasks",
+                name: "loxo_get_todays_tasks",
                 description: "Get all tasks and scheduled activities for today or a date range",
                 inputSchema: {
                     type: "object",
@@ -145,7 +145,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "schedule-activity",
+                name: "loxo_schedule_activity",
                 description: "Schedule a future activity (like a call or meeting) by creating a person event",
                 inputSchema: {
                     type: "object",
@@ -179,7 +179,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "search-candidates",
+                name: "loxo_search_candidates",
                 description: "Search for candidates in Loxo. Use the 'query' field for complex Lucene queries, including searching past employment (e.g., 'job_profiles.company_name:\"Old Company\"'). The 'company' parameter targets current employment.",
                 inputSchema: {
                     type: "object",
@@ -224,7 +224,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "get-candidate",
+                name: "loxo_get_candidate",
                 description: "Get detailed information from a candidate's main profile. This may include summaries or full lists of job/education profiles. For guaranteed complete lists and then full details of each item, use list-person-job-profiles, get-person-job-profile-detail, etc., and similarly for education, emails, and phones.",
                 inputSchema: {
                     type: "object",
@@ -238,7 +238,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "get-person-emails",
+                name: "loxo_get_person_emails",
                 description: "Get all email addresses for a specific person.",
                 inputSchema: {
                     type: "object",
@@ -249,7 +249,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "get-person-phones",
+                name: "loxo_get_person_phones",
                 description: "Get all phone numbers for a specific person.",
                 inputSchema: {
                     type: "object",
@@ -260,7 +260,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "list-person-job-profiles",
+                name: "loxo_list_person_job_profiles",
                 description: "Lists job profiles (work history summaries/IDs) for a person. Use get-person-job-profile-detail for full details of each.",
                 inputSchema: {
                     type: "object",
@@ -271,7 +271,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "get-person-job-profile-detail",
+                name: "loxo_get_person_job_profile_detail",
                 description: "Get full details for a specific job profile (work history item) of a person.",
                 inputSchema: {
                     type: "object",
@@ -283,7 +283,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "list-person-education-profiles",
+                name: "loxo_list_person_education_profiles",
                 description: "Lists education profiles (summaries/IDs) for a person. Use get-person-education-profile-detail for full details of each.",
                 inputSchema: {
                     type: "object",
@@ -294,7 +294,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "get-person-education-profile-detail",
+                name: "loxo_get_person_education_profile_detail",
                 description: "Get full details for a specific education profile item of a person.",
                 inputSchema: {
                     type: "object",
@@ -306,7 +306,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "search-jobs",
+                name: "loxo_search_jobs",
                 description: "Search for jobs in Loxo using page-based pagination",
                 inputSchema: {
                     type: "object",
@@ -327,7 +327,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "get-job",
+                name: "loxo_get_job",
                 description: "Get detailed information about a specific job",
                 inputSchema: {
                     type: "object",
@@ -341,7 +341,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "log-activity",
+                name: "loxo_log_activity",
                 description: "Log a completed activity by creating a person event (logged with current timestamp)",
                 inputSchema: {
                     type: "object",
@@ -371,7 +371,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 }
             },
             {
-                name: "search-companies",
+                name: "loxo_search_companies",
                 description: "Search for companies in Loxo.",
                 inputSchema: {
                     type: "object",
@@ -386,7 +386,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "get-company-details",
+                name: "loxo_get_company_details",
                 description: "Get detailed information about a specific company.",
                 inputSchema: {
                     type: "object",
@@ -397,7 +397,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                 },
             },
             {
-                name: "list-users",
+                name: "loxo_list_users",
                 description: "Get a list of users in the Loxo agency.",
                 inputSchema: {
                     type: "object",
@@ -413,13 +413,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args = {} } = request.params;
     try {
         switch (name) {
-            case "get-activity-types": {
+            case "loxo_get_activity_types": {
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/activity_types`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "get-todays-tasks": {
+            case "loxo_get_todays_tasks": {
                 const { user_id, start_date, end_date, per_page, scroll_id } = args;
                 let searchParams = new URLSearchParams();
                 if (user_id)
@@ -440,7 +440,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         }]
                 };
             }
-            case "schedule-activity": {
+            case "loxo_schedule_activity": {
                 const { person_id, job_id, company_id, activity_type_id, created_at, notes } = PersonEventSchema.parse(args);
                 const formData = new URLSearchParams();
                 if (person_id)
@@ -466,7 +466,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         }]
                 };
             }
-            case "search-candidates": {
+            case "loxo_search_candidates": {
                 const { query, company, title, scroll_id, per_page, person_global_status_id, person_type_id, list_id, include_related_agencies } = SearchCandidatesSchema.parse(args); // Use the new specific schema
                 let searchParams = new URLSearchParams();
                 if (per_page)
@@ -532,14 +532,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     };
                 }
             }
-            case "get-candidate": {
+            case "loxo_get_candidate": {
                 const { id } = EntityIdSchema.parse(args);
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "search-jobs": {
+            case "loxo_search_jobs": {
                 const { query, per_page, page } = args;
                 // Build search params
                 let searchParams = new URLSearchParams();
@@ -557,14 +557,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                         }]
                 };
             }
-            case "get-job": {
+            case "loxo_get_job": {
                 const { id } = EntityIdSchema.parse(args);
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/${id}`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "log-activity": {
+            case "loxo_log_activity": {
                 const { person_id, job_id, company_id, activity_type_id, notes } = PersonEventSchema.parse(args);
                 const formData = new URLSearchParams();
                 if (person_id)
@@ -585,7 +585,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "search-companies": {
+            case "loxo_search_companies": {
                 const { query, scroll_id, company_type_id, list_id, company_global_status_id } = SearchCompaniesSchema.parse(args);
                 let searchParams = new URLSearchParams();
                 if (query)
@@ -603,7 +603,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "get-company-details": {
+            case "loxo_get_company_details": {
                 const { company_id } = GetCompanyDetailsSchema.parse(args);
                 const response = await makeRequest(// Assuming a single Company object is returned
                 `/${env.LOXO_AGENCY_SLUG}/companies/${company_id}`);
@@ -611,7 +611,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "list-users": {
+            case "loxo_list_users": {
                 // ListUsersSchema is empty, so no args to parse specifically for it.
                 const response = await makeRequest(// Assuming a ListUsersResponse object
                 `/${env.LOXO_AGENCY_SLUG}/users`);
@@ -619,21 +619,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "get-person-emails": {
+            case "loxo_get_person_emails": {
                 const { id: person_id } = EntityIdSchema.parse(args); // 'id' from input is person_id
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/emails`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "get-person-phones": {
+            case "loxo_get_person_phones": {
                 const { id: person_id } = EntityIdSchema.parse(args);
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/phones`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "list-person-job-profiles": {
+            case "loxo_list_person_job_profiles": {
                 const { id: person_id } = EntityIdSchema.parse(args);
                 // Assuming this endpoint returns an array of full JobProfile objects for now.
                 // If it returns summaries/IDs, the response type <JobProfile[]> might need adjustment.
@@ -642,14 +642,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "get-person-job-profile-detail": {
+            case "loxo_get_person_job_profile_detail": {
                 const { person_id, resource_id: job_profile_id } = PersonSubResourceIdSchema.parse(args);
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles/${job_profile_id}`);
                 return {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "list-person-education-profiles": {
+            case "loxo_list_person_education_profiles": {
                 const { id: person_id } = EntityIdSchema.parse(args);
                 // Assuming this endpoint returns an array of full EducationProfile objects for now.
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles`);
@@ -657,7 +657,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
                 };
             }
-            case "get-person-education-profile-detail": {
+            case "loxo_get_person_education_profile_detail": {
                 const { person_id, resource_id: education_profile_id } = PersonSubResourceIdSchema.parse(args);
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles/${education_profile_id}`);
                 return {
