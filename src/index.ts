@@ -357,7 +357,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: "Get a list of activity types from Loxo",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
           required: [],
         },
         annotations: {
@@ -392,6 +398,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             scroll_id: {
               type: "string",
               description: "Cursor for pagination"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
             }
           },
           required: [],
@@ -508,6 +519,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: {
               type: "string",
               description: "Candidate ID"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
             }
           },
           required: ["id"]
@@ -525,7 +541,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string", description: "The ID of the person." } // Reusing 'id' from EntityIdSchema
+            id: { type: "string", description: "The ID of the person." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["id"],
         },
@@ -542,7 +563,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string", description: "The ID of the person." }
+            id: { type: "string", description: "The ID of the person." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["id"],
         },
@@ -559,7 +585,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string", description: "The ID of the person."}
+            id: { type: "string", description: "The ID of the person."},
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["id"],
         },
@@ -577,7 +608,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             person_id: { type: "string", description: "The ID of the person." },
-            resource_id: { type: "string", description: "The ID of the job profile." }
+            resource_id: { type: "string", description: "The ID of the job profile." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["person_id", "resource_id"],
         },
@@ -594,7 +630,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            id: { type: "string", description: "The ID of the person." }
+            id: { type: "string", description: "The ID of the person." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["id"],
         },
@@ -612,7 +653,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             person_id: { type: "string", description: "The ID of the person." },
-            resource_id: { type: "string", description: "The ID of the education profile." }
+            resource_id: { type: "string", description: "The ID of the education profile." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["person_id", "resource_id"],
         },
@@ -640,6 +686,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             per_page: {
               type: "number",
               description: "Number of results per page"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
             }
           }
         },
@@ -659,6 +710,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: {
               type: "string",
               description: "Job ID"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
             }
           },
           required: ["id"]
@@ -716,7 +772,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             scroll_id: { type: "string", description: "Cursor for pagination." },
             company_type_id: { type: "integer", description: "Filter by company type ID." },
             list_id: { type: "integer", description: "Filter by list ID." },
-            company_global_status_id: { type: "integer", description: "Filter by company global status ID." }
+            company_global_status_id: { type: "integer", description: "Filter by company global status ID." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: [],
         },
@@ -733,7 +794,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: {
           type: "object",
           properties: {
-            company_id: { type: "integer", description: "The ID of the company to retrieve." }
+            company_id: { type: "integer", description: "The ID of the company to retrieve." },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
           },
           required: ["company_id"],
         },
@@ -749,7 +815,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: "Get a list of users in the Loxo agency.",
         inputSchema: {
           type: "object",
-          properties: {},
+          properties: {
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
           required: [],
         },
         annotations: {
@@ -770,14 +842,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "loxo_get_activity_types": {
+        const { response_format = 'json' } = args as any;
         const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/activity_types`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_get_todays_tasks": {
-        const { user_id, start_date, end_date, per_page, scroll_id } = args as any;
+        const { user_id, start_date, end_date, per_page, scroll_id, response_format = 'json' } = args as any;
 
         let searchParams = new URLSearchParams();
         if (user_id) searchParams.append('user_id', user_id.toString());
@@ -789,10 +864,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/schedule_items?${searchParams.toString()}`
         );
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(response, null, 2)
+            text
           }]
         };
       }
@@ -910,15 +987,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
       case "loxo_get_candidate": {
-        const { id } = EntityIdSchema.parse(args);
+        const { id, response_format = 'json' } = args as any;
         const response = await makeRequest<Candidate>(`/${env.LOXO_AGENCY_SLUG}/people/${id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_search_jobs": {
-        const { query, per_page, page } = args as any;
+        const { query, per_page, page, response_format = 'json' } = args as any;
 
         // Build search params
         let searchParams = new URLSearchParams();
@@ -930,19 +1009,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `/${env.LOXO_AGENCY_SLUG}/jobs?${searchParams.toString()}`
         );
 
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+
         return {
           content: [{
             type: "text",
-            text: JSON.stringify(response, null, 2)
+            text
           }]
         };
       }
 
       case "loxo_get_job": {
-        const { id } = EntityIdSchema.parse(args);
+        const { id, response_format = 'json' } = args as any;
         const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/${id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
@@ -970,97 +1054,113 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_search_companies": {
-        const { 
-          query, 
-          scroll_id, 
-          company_type_id, 
-          list_id, 
-          company_global_status_id
-        } = SearchCompaniesSchema.parse(args);
-        
+        const {
+          query,
+          scroll_id,
+          company_type_id,
+          list_id,
+          company_global_status_id,
+          response_format = 'json'
+        } = args as any;
+
         let searchParams = new URLSearchParams();
         if (query) searchParams.append('query', query);
         if (scroll_id) searchParams.append('scroll_id', scroll_id);
         if (company_type_id) searchParams.append('company_type_id', company_type_id.toString());
         if (list_id) searchParams.append('list_id', list_id.toString());
         if (company_global_status_id) searchParams.append('company_global_status_id', company_global_status_id.toString());
-        
+
         const response = await makeRequest<SearchCompaniesResponse>(
           `/${env.LOXO_AGENCY_SLUG}/companies?${searchParams.toString()}`
         );
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_get_company_details": {
-        const { company_id } = GetCompanyDetailsSchema.parse(args);
-        const response = await makeRequest<Company>( // Assuming a single Company object is returned
+        const { company_id, response_format = 'json' } = args as any;
+        const response = await makeRequest<Company>(
           `/${env.LOXO_AGENCY_SLUG}/companies/${company_id}`
         );
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_list_users": {
-        // ListUsersSchema is empty, so no args to parse specifically for it.
-        const response = await makeRequest<ListUsersResponse>( // Assuming a ListUsersResponse object
+        const { response_format = 'json' } = args as any;
+        const response = await makeRequest<ListUsersResponse>(
           `/${env.LOXO_AGENCY_SLUG}/users`
         );
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_get_person_emails": {
-        const { id: person_id } = EntityIdSchema.parse(args); // 'id' from input is person_id
+        const { id: person_id, response_format = 'json' } = args as any;
         const response = await makeRequest<EmailInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/emails`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_get_person_phones": {
-        const { id: person_id } = EntityIdSchema.parse(args); 
+        const { id: person_id, response_format = 'json' } = args as any;
         const response = await makeRequest<PhoneInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/phones`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_list_person_job_profiles": {
-        const { id: person_id } = EntityIdSchema.parse(args);
-        // Assuming this endpoint returns an array of full JobProfile objects for now.
-        // If it returns summaries/IDs, the response type <JobProfile[]> might need adjustment.
+        const { id: person_id, response_format = 'json' } = args as any;
         const response = await makeRequest<JobProfile[]>(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_get_person_job_profile_detail": {
-        const { person_id, resource_id: job_profile_id } = PersonSubResourceIdSchema.parse(args);
+        const { person_id, resource_id: job_profile_id, response_format = 'json' } = args as any;
         const response = await makeRequest<JobProfile>(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles/${job_profile_id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_list_person_education_profiles": {
-        const { id: person_id } = EntityIdSchema.parse(args);
-        // Assuming this endpoint returns an array of full EducationProfile objects for now.
+        const { id: person_id, response_format = 'json' } = args as any;
         const response = await makeRequest<EducationProfile[]>(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
       case "loxo_get_person_education_profile_detail": {
-        const { person_id, resource_id: education_profile_id } = PersonSubResourceIdSchema.parse(args);
+        const { person_id, resource_id: education_profile_id, response_format = 'json' } = args as any;
         const response = await makeRequest<EducationProfile>(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles/${education_profile_id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return {
-          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+          content: [{ type: "text", text }]
         };
       }
 
