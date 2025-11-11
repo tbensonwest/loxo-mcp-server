@@ -48,6 +48,8 @@ interface Person {
     current_title?: string;
     current_company?: string;
     location?: string;
+    skillsets?: string;
+    all_raw_tags?: string;
 }
 
 interface SearchPeopleResponse {
@@ -225,6 +227,8 @@ interface CandidateSearchResult {
     current_title?: string;
     current_company?: string;
     location?: string;
+    skillsets?: string;  // Skills for filtering without full profile fetch
+    all_raw_tags?: string;  // Tags for filtering without full profile fetch
     // Add primary_email and primary_phone if the search endpoint can provide them easily
 }
 
@@ -346,7 +350,7 @@ const SearchSchema = z.object({
     company: z.string().optional(),
     title: z.string().optional(),
     scroll_id: z.union([z.number(), z.string()]).optional(), // Accept both number and string
-    per_page: z.number().optional().default(20)
+    per_page: z.number().optional().default(100)
 });
 
 // Schema specifically for search-candidates tool arguments
@@ -355,7 +359,7 @@ const SearchCandidatesSchema = z.object({
     company: z.string().optional().describe("Current company name to search for."),
     title: z.string().optional().describe("Current job title to search for."),
     scroll_id: z.string().optional().describe("Pagination scroll ID from previous search results."), // API expects string
-    per_page: z.number().int().optional().default(20).describe("Number of results per page (default 20, max typically 100 by Loxo)."),
+    per_page: z.number().int().optional().default(100).describe("Number of results per page (default 100, max typically 100 by Loxo)."),
     person_global_status_id: z.number().int().optional().describe("Filter by person global status ID."),
     person_type_id: z.number().int().optional().describe("Filter by person type ID."),
     list_id: z.number().int().optional().describe("Filter by person list ID."),
@@ -519,7 +523,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_search_candidates",
-        description: "Search for candidates using Lucene query syntax. Uses cursor-based pagination with scroll_id. Lucene examples: (1) Past employer: query='job_profiles.company_name:\"Google\"' (2) Skills: query='skillsets:\"Python\"' (3) Combined: query='job_profiles.company_name:\"Microsoft\" AND skillsets:\"Java\"' (4) Current role: company='Acme Corp' and title='Engineer'. Parameters can be combined. Use scroll_id from response for next page. Returns: id, name, current_title, current_company, location.",
+        description: "Search for candidates using Lucene query syntax. Uses cursor-based pagination with scroll_id. Returns skillsets and tags in results for filtering without additional API calls.\n\nIMPORTANT - LOXO FIELD NAME MAPPING:\n- Query uses 'skills' (search index field): query='skills:\"Python\"'\n- Response returns 'skillsets' (API field): {skillsets: \"Python, JavaScript\"}\n- Query uses 'all_raw_tags', response returns 'all_raw_tags' (same)\n\nSIMPLE QUERY EXAMPLES:\n(1) Past employer: query='job_profiles.company_name:\"Google\"'\n(2) Skills: query='skills:\"Python\"'\n(3) Current role: company='Acme Corp' and title='Engineer'\n\nCOMPLEX MULTI-CRITERIA EXAMPLES:\n(4) Multiple titles with skills: query='(current_title:\"Director\" OR current_title:\"Senior Director\") AND skills:\"financial due diligence\"'\n(5) Multiple role types at specific level: query='(current_title:(\"Deal Advisory\" OR \"Transaction Services\" OR \"Transaction Advisory\")) AND current_title:\"Director\" AND skills:\"due diligence\"'\n(6) Past companies with skills: query='(job_profiles.company_name:(\"KPMG\" OR \"Deloitte\" OR \"PwC\" OR \"EY\")) AND skills:(\"M&A\" OR \"financial due diligence\")'\n(7) Combined current AND past: query='current_title:\"Director\" AND job_profiles.company_name:(\"Big 4\") AND skills:\"financial modeling\"'\n(8) Tags: query='all_raw_tags:\"key account\"'\n\nNULL/EMPTY FIELD SEARCHES (data quality checks):\n(9) Candidates WITHOUT skills: query='NOT _exists_:skills'\n(10) Candidates WITH skills: query='_exists_:skills'\n(11) Candidates WITHOUT tags: query='NOT _exists_:all_raw_tags'\n(12) Candidates missing location: query='NOT _exists_:location'\n(13) Candidates missing current company: query='NOT _exists_:current_company'\n\nTIPS: Use OR for multiple options, AND to combine criteria, parentheses for grouping, NOT _exists_:fieldname for null checks. ALWAYS use search index field names (skills not skillsets) in queries. Start with comprehensive queries to get all relevant candidates in fewer API calls.\n\nReturns: id, name, current_title, current_company, location, skillsets (from 'skills' field), all_raw_tags. Use scroll_id from pagination for next page.",
         inputSchema: {
           type: "object",
           properties: {
@@ -541,7 +545,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             },
             per_page: {
               type: "number",
-              description: "Number of results per page (default 20, max typically 100 by Loxo)."
+              description: "Number of results per page (default 100, max typically 100 by Loxo)."
             },
             person_global_status_id: {
                 type: "integer",
@@ -1031,6 +1035,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 current_title: person.current_title,
                 current_company: person.current_company,
                 location: person.location,
+                skillsets: person.skillsets,
+                all_raw_tags: person.all_raw_tags,
             }));
             
             const toolResponse: SearchCandidatesToolResponse = {
