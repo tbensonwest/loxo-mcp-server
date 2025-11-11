@@ -146,7 +146,7 @@ Once configured, you can interact with the Loxo MCP server through natural langu
 **You:** "Find me candidates who have worked at Google and know TypeScript"
 
 **Claude will:**
-1. Use `search-candidates` with query: `job_profiles.company_name:"Google" AND skillsets:"TypeScript"`
+1. Use `search-candidates` with query: `job_profiles.company_name:"Google" AND skills:"TypeScript"`
 2. Return a list of matching candidates with their current roles, locations, **skills, and tags visible in search results** (no need to fetch full profiles for basic filtering)
 
 ---
@@ -154,7 +154,7 @@ Once configured, you can interact with the Loxo MCP server through natural langu
 **You:** "Give me all candidates in deal advisory, transaction services, or transaction advisory with financial due diligence skills at director level"
 
 **Claude will:**
-1. Use `search-candidates` with complex query: `(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) AND current_title:"Director" AND skillsets:"financial due diligence"`
+1. Use `search-candidates` with complex query: `(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) AND current_title:"Director" AND skills:"financial due diligence"`
 2. Return comprehensive results (100 per page by default) with skills visible
 3. Filter and present matching candidates in a single response
 
