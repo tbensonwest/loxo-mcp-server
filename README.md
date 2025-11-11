@@ -147,7 +147,16 @@ Once configured, you can interact with the Loxo MCP server through natural langu
 
 **Claude will:**
 1. Use `search-candidates` with query: `job_profiles.company_name:"Google" AND skillsets:"TypeScript"`
-2. Return a list of matching candidates with their current roles and locations
+2. Return a list of matching candidates with their current roles, locations, **skills, and tags visible in search results** (no need to fetch full profiles for basic filtering)
+
+---
+
+**You:** "Give me all candidates in deal advisory, transaction services, or transaction advisory with financial due diligence skills at director level"
+
+**Claude will:**
+1. Use `search-candidates` with complex query: `(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) AND current_title:"Director" AND skillsets:"financial due diligence"`
+2. Return comprehensive results (100 per page by default) with skills visible
+3. Filter and present matching candidates in a single response
 
 ---
 
@@ -164,6 +173,42 @@ Once configured, you can interact with the Loxo MCP server through natural langu
 **Claude will:**
 1. Use `list-person-job-profiles` to get all job entries
 2. Optionally use `get-person-job-profile-detail` for each entry to show full details
+
+---
+
+### Advanced Search Techniques
+
+The `search-candidates` tool supports complex Lucene queries for precise candidate filtering:
+
+**Multiple Role Types with Skills:**
+```
+query='(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) 
+       AND current_title:"Director" 
+       AND skillsets:"financial due diligence"'
+```
+
+**Past Companies with Multiple Skills:**
+```
+query='(job_profiles.company_name:("KPMG" OR "Deloitte" OR "PwC" OR "EY")) 
+       AND skillsets:("M&A" OR "financial due diligence")'
+```
+
+**Combined Current and Past Experience:**
+```
+query='current_title:"Director" 
+       AND job_profiles.company_name:("Big 4") 
+       AND skillsets:"financial modeling"'
+```
+
+**Using Tags:**
+```
+query='all_raw_tags:"key account" AND current_title:"VP"'
+```
+
+**Benefits:**
+- Returns **100 results per page** (vs 20 previously) for fewer API calls
+- **Skillsets and tags visible in search results** - no need to fetch full profiles for filtering
+- Construct comprehensive queries upfront to get all relevant candidates in 1-2 API calls instead of 10+
 
 ---
 
@@ -278,7 +323,7 @@ The server provides the following tools for AI assistants:
 - `log-activity` - Log completed person events
 
 ### Candidate/People Management
-- `search-candidates` - Search using Lucene syntax (scroll_id pagination)
+- `search-candidates` - Search using Lucene syntax with complex multi-criteria queries (scroll_id pagination, returns skillsets and tags in results, 100 results per page default)
 - `get-candidate` - Get full candidate profile
 - `get-person-emails` - Get all email addresses
 - `get-person-phones` - Get all phone numbers
