@@ -178,26 +178,30 @@ Once configured, you can interact with the Loxo MCP server through natural langu
 
 ### Advanced Search Techniques
 
-The `search-candidates` tool supports complex Lucene queries for precise candidate filtering:
+The `search-candidates` tool supports complex Lucene queries for precise candidate filtering.
+
+**IMPORTANT - Field Name Mapping:**
+- Queries use `skills` (search index): `query='skills:"Python"'`
+- Responses return `skillsets` (API field): `{skillsets: "Python, JavaScript"}`
 
 **Multiple Role Types with Skills:**
 ```
 query='(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) 
        AND current_title:"Director" 
-       AND skillsets:"financial due diligence"'
+       AND skills:"financial due diligence"'
 ```
 
 **Past Companies with Multiple Skills:**
 ```
 query='(job_profiles.company_name:("KPMG" OR "Deloitte" OR "PwC" OR "EY")) 
-       AND skillsets:("M&A" OR "financial due diligence")'
+       AND skills:("M&A" OR "financial due diligence")'
 ```
 
 **Combined Current and Past Experience:**
 ```
 query='current_title:"Director" 
        AND job_profiles.company_name:("Big 4") 
-       AND skillsets:"financial modeling"'
+       AND skills:"financial modeling"'
 ```
 
 **Using Tags:**
@@ -205,10 +209,23 @@ query='current_title:"Director"
 query='all_raw_tags:"key account" AND current_title:"VP"'
 ```
 
+**Data Quality - Finding Missing Fields:**
+```
+# Candidates without skills
+query='NOT _exists_:skills'
+
+# Candidates without tags  
+query='NOT _exists_:all_raw_tags'
+
+# Candidates missing location
+query='NOT _exists_:location'
+```
+
 **Benefits:**
 - Returns **100 results per page** (vs 20 previously) for fewer API calls
 - **Skillsets and tags visible in search results** - no need to fetch full profiles for filtering
 - Construct comprehensive queries upfront to get all relevant candidates in 1-2 API calls instead of 10+
+- Use `NOT _exists_:` to find incomplete profiles for data cleanup
 
 ---
 
