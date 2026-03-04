@@ -347,6 +347,15 @@ query='NOT _exists_:location'
 
 The server provides the following tools for AI assistants:
 
+### New in v2
+
+- `loxo_create_candidate` — Create a new candidate from a CV or other source
+- `loxo_update_candidate` — Update an existing candidate's details
+- `loxo_get_candidate_brief` — Get full profile + contacts + recent activities in one call (use before drafting outreach)
+- `loxo_get_candidate_activities` — Get full activity history for a candidate
+- `loxo_get_job_pipeline` — See all candidates on a job and their pipeline stage
+- `loxo_apply_to_job` — Add a candidate to a job's pipeline
+
 ### Activity & Event Management
 - `get-activity-types` - List available activity types
 - `get-todays-tasks` - Get scheduled items (supports date filtering)
