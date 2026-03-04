@@ -18,11 +18,11 @@ export type EnvConfig = z.infer<typeof envSchema>;
 
 export function validateEnv(): EnvConfig {
   const result = envSchema.safeParse(process.env);
-  
-  if (\!result.success) {
-    console.error('❌ Invalid environment variables:', result.error.format());
+
+  if (!result.success) {
+    console.error('Invalid environment variables:', result.error.format());
     process.exit(1);
   }
-  
+
   return result.data;
 }
