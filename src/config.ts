@@ -4,7 +4,8 @@ import { resolve } from 'path';
 
 // Load environment variables from .env file
 loadEnv({
-  path: resolve(process.cwd(), '.env')
+  path: resolve(process.cwd(), '.env'),
+  quiet: true
 });
 
 const envSchema = z.object({
@@ -18,7 +19,7 @@ export type EnvConfig = z.infer<typeof envSchema>;
 export function validateEnv(): EnvConfig {
   const result = envSchema.safeParse(process.env);
   
-  if (!result.success) {
+  if (\!result.success) {
     console.error('❌ Invalid environment variables:', result.error.format());
     process.exit(1);
   }
