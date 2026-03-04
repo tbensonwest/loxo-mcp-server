@@ -973,6 +973,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["person_id"],
         },
       },
+      {
+        name: "loxo_get_candidate_brief",
+        description: "Get a complete candidate brief in one call: full profile, all contact details, and 5 most recent activities. Use this as the first step before drafting any outreach — it gives you everything you need to write a personalised message without making multiple API calls. Returns: profile fields, email list, phone list, recent_activities (last 5).",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "The candidate's person ID (required)." },
+          },
+          required: ["id"],
+        },
+      },
     ]
   };
 });
@@ -1433,6 +1445,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
 
         const { text } = truncateResponse(JSON.stringify(toolResponse, null, 2));
+        return { content: [{ type: "text", text }] };
+      }
+
+      case "loxo_get_candidate_brief": {
+        const { id } = args as any;
+
+        const [profile, emails, phones, activitiesResponse] = await Promise.all([
+          makeRequest<Candidate>(`/${env.LOXO_AGENCY_SLUG}/people/${id}`),
+          makeRequest<EmailInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${id}/emails`),
+          makeRequest<PhoneInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${id}/phones`),
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/person_events?person_id=${id}&per_page=5`),
+        ]);
+
+        const recentActivities = activitiesResponse?.person_events
+          || activitiesResponse?.events
+          || activitiesResponse
+          || [];
+
+        const brief = {
+          profile,
+          emails,
+          phones,
+          recent_activities: Array.isArray(recentActivities)
+            ? recentActivities.slice(0, 5)
+            : [],
+        };
+
+        const { text } = truncateResponse(JSON.stringify(brief, null, 2));
         return { content: [{ type: "text", text }] };
       }
 
