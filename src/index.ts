@@ -392,6 +392,28 @@ const PersonSubResourceIdSchema = z.object({
   resource_id: z.string() // Represents job_profile_id or education_profile_id
 });
 
+const CreateCandidateSchema = z.object({
+  name: z.string().describe("Full name of the candidate (required)."),
+  email: z.string().optional().describe("Primary email address."),
+  phone: z.string().optional().describe("Primary phone number."),
+  current_title: z.string().optional().describe("Current job title."),
+  current_company: z.string().optional().describe("Current employer name."),
+  location: z.string().optional().describe("City, region, or country."),
+  person_type_id: z.number().int().optional().describe("Person type ID. Use to flag CV-sourced candidates (e.g. Prospect type) to prevent polluting active pipelines. Get valid IDs from loxo_list_users or Loxo settings."),
+  tags: z.string().optional().describe("Comma-separated tags to apply (e.g. 'cv-import,sourced-march-2026')."),
+});
+
+const UpdateCandidateSchema = z.object({
+  id: z.string().describe("The candidate's person ID."),
+  name: z.string().optional().describe("Full name."),
+  email: z.string().optional().describe("Primary email address."),
+  phone: z.string().optional().describe("Primary phone number."),
+  current_title: z.string().optional().describe("Current job title."),
+  current_company: z.string().optional().describe("Current employer name."),
+  location: z.string().optional().describe("City, region, or country."),
+  person_type_id: z.number().int().optional().describe("Person type ID."),
+  tags: z.string().optional().describe("Comma-separated tags to apply."),
+});
 
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
 type SearchArgs = z.infer<typeof SearchSchema>; // Generic search, might deprecate if specific ones cover all uses
@@ -897,7 +919,46 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           idempotentHint: true,
           openWorldHint: true,
         },
-      }
+      },
+      {
+        name: "loxo_create_candidate",
+        description: "Create a new candidate record in Loxo. Primary use case: after Claude parses a downloaded CV, call this to add the person to the database. Use person_type_id to assign a 'Prospect' or similar type so the candidate doesn't appear in active pipeline searches until qualified. Example: After parsing a CV, create with name, email, current_title, current_company, and person_type_id=<prospect_type_id>.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Full name (required)." },
+            email: { type: "string", description: "Primary email address." },
+            phone: { type: "string", description: "Primary phone number." },
+            current_title: { type: "string", description: "Current job title." },
+            current_company: { type: "string", description: "Current employer." },
+            location: { type: "string", description: "City, region, or country." },
+            person_type_id: { type: "number", description: "Person type ID for categorisation (e.g. Prospect). Use to prevent pipeline pollution." },
+            tags: { type: "string", description: "Comma-separated tags (e.g. 'cv-import,march-2026')." },
+          },
+          required: ["name"],
+        },
+      },
+      {
+        name: "loxo_update_candidate",
+        description: "Update an existing candidate's record in Loxo. Use when a CV belongs to someone already in the system and you want to refresh their details. Provide only the fields you want to change — all parameters are optional except id.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Candidate person ID (required)." },
+            name: { type: "string", description: "Full name." },
+            email: { type: "string", description: "Primary email address." },
+            phone: { type: "string", description: "Primary phone number." },
+            current_title: { type: "string", description: "Current job title." },
+            current_company: { type: "string", description: "Current employer." },
+            location: { type: "string", description: "City, region, or country." },
+            person_type_id: { type: "number", description: "Person type ID." },
+            tags: { type: "string", description: "Comma-separated tags." },
+          },
+          required: ["id"],
+        },
+      },
     ]
   };
 });
@@ -1279,6 +1340,58 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { text } = truncateResponse(formatted);
         return {
           content: [{ type: "text", text }]
+        };
+      }
+
+      case "loxo_create_candidate": {
+        const { name, email, phone, current_title, current_company, location, person_type_id, tags } = CreateCandidateSchema.parse(args);
+
+        const formData = new URLSearchParams();
+        formData.append('person[name]', name);
+        if (email) formData.append('person[email_addresses][][value]', email);
+        if (phone) formData.append('person[phone_numbers][][value]', phone);
+        if (current_title) formData.append('person[title]', current_title);
+        if (current_company) formData.append('person[company]', current_company);
+        if (location) formData.append('person[location]', location);
+        if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
+        if (tags) formData.append('person[tag_list]', tags);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/people`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_update_candidate": {
+        const { id, name: updateName, email, phone, current_title, current_company, location, person_type_id, tags } = UpdateCandidateSchema.parse(args);
+
+        const formData = new URLSearchParams();
+        if (updateName) formData.append('person[name]', updateName);
+        if (email) formData.append('person[email_addresses][][value]', email);
+        if (phone) formData.append('person[phone_numbers][][value]', phone);
+        if (current_title) formData.append('person[title]', current_title);
+        if (current_company) formData.append('person[company]', current_company);
+        if (location) formData.append('person[location]', location);
+        if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
+        if (tags) formData.append('person[tag_list]', tags);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/people/${id}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
         };
       }
 
