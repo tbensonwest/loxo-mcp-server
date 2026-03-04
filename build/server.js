@@ -1230,11 +1230,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 const { job_id, per_page, scroll_id, response_format = 'json' } = args;
                 requireNumericId(job_id, 'job_id');
                 const params = new URLSearchParams();
+                params.append('job_id', job_id);
                 if (per_page)
                     params.append('per_page', per_page.toString());
                 if (scroll_id)
                     params.append('scroll_id', scroll_id);
-                const apiResponse = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/job_contacts?${params.toString()}`);
+                const apiResponse = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/job_contacts?${params.toString()}`);
                 const contacts = apiResponse?.job_contacts || apiResponse?.contacts || apiResponse || [];
                 const toolResponse = {
                     job_id,
@@ -1255,8 +1256,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 requireNumericId(job_id, 'job_id');
                 requireNumericId(person_id, 'person_id');
                 const formData = new URLSearchParams();
+                formData.append('job_contact[job_id]', job_id.toString());
                 formData.append('job_contact[person_id]', person_id.toString());
-                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/job_contacts`, {
+                const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/job_contacts`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formData.toString(),
