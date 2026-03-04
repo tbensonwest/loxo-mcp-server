@@ -1,4 +1,5 @@
 [![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tbensonwest-loxo-mcp-server-badge.png)](https://mseep.ai/app/tbensonwest-loxo-mcp-server)
+![CI](https://github.com/tbensonwest/loxo-mcp-server/actions/workflows/ci.yml/badge.svg)
 
 # Loxo MCP Server
 

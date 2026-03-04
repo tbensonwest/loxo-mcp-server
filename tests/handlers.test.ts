@@ -254,20 +254,14 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('returns error when job_id is missing', async () => {
-      let caughtError: unknown;
-      let result: Awaited<ReturnType<typeof callTool>> | undefined;
-      try {
-        result = await callTool(client, 'loxo_apply_to_job', { person_id: '42' });
-      } catch (err) {
-        caughtError = err;
-      }
-      // Either the MCP SDK rejects the request at the protocol level (thrown error)
-      // or the handler catches the fetch failure and returns isError: true
-      if (result !== undefined) {
-        expect(result.isError).toBe(true);
-      } else {
-        expect(caughtError).toBeDefined();
-      }
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        text: () => Promise.resolve(JSON.stringify({ error: 'job_id is required' })),
+      }));
+      const result = await callTool(client, 'loxo_apply_to_job', { person_id: '42' });
+      expect(result.isError).toBe(true);
     });
   });
 
