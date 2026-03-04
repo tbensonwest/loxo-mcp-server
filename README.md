@@ -8,6 +8,16 @@ A Model Context Protocol (MCP) server that provides tools for interacting with t
 
 ## Installation
 
+### Option 0: Install via Smithery (easiest)
+
+Install automatically for Claude Desktop via [Smithery](https://smithery.ai/server/loxo-mcp-server):
+
+```bash
+npx -y @smithery/cli install loxo-mcp-server --client claude
+```
+
+[![smithery badge](https://smithery.ai/badge/loxo-mcp-server)](https://smithery.ai/server/loxo-mcp-server)
+
 ### Option 1: Local Installation
 
 ```bash
