@@ -158,7 +158,7 @@ describe('Loxo MCP tool handlers', () => {
   describe('loxo_get_job_pipeline', () => {
     it('returns candidates in pipeline', async () => {
       mockFetch({
-        job_contacts: [{ id: 1, person: { name: 'Jane Smith' }, stage: 'Interviewing' }],
+        candidates: [{ id: 1, person: { name: 'Jane Smith' }, workflow_stage_id: 1 }],
         total_count: 1,
         scroll_id: null,
       });
