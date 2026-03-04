@@ -302,7 +302,7 @@ async function makeRequest<T>(endpoint: string, options: RequestInit = {}): Prom
         }
 
         // Only try to parse as JSON if we have content
-        return responseText ? JSON.parse(responseText) : null;
+        return responseText ? JSON.parse(responseText) : (null as unknown as T);
     } catch (error) {
         // If it's already our formatted error, re-throw it
         if (error instanceof Error && error.message.includes('Next steps:')) {
