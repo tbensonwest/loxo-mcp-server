@@ -999,6 +999,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["job_id"],
         },
       },
+      {
+        name: "loxo_apply_to_job",
+        description: "Add a candidate to a job's pipeline. Use after identifying a good candidate match to assign them to a role. Example: After searching for and finding a suitable candidate, call this to add them to the job pipeline so they appear in loxo_get_job_pipeline.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            job_id: { type: "string", description: "The job ID (required)." },
+            person_id: { type: "string", description: "The candidate's person ID (required)." },
+          },
+          required: ["job_id", "person_id"],
+        },
+      },
     ]
   };
 });
@@ -1515,6 +1528,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const { text } = truncateResponse(JSON.stringify(toolResponse, null, 2));
         return { content: [{ type: "text", text }] };
+      }
+
+      case "loxo_apply_to_job": {
+        const { job_id, person_id } = args as any;
+
+        const formData = new URLSearchParams();
+        formData.append('job_contact[person_id]', person_id.toString());
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/job_contacts`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
       }
 
       default:
