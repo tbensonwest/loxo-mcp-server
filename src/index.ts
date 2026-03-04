@@ -959,6 +959,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id"],
         },
       },
+      {
+        name: "loxo_get_candidate_activities",
+        description: "Get the activity history for a candidate — all calls, emails, meetings, and notes logged against them. Use before drafting outreach to see recent contact history and avoid re-pitching someone just spoken to. Returns most recent activities first. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            person_id: { type: "string", description: "The candidate's person ID (required)." },
+            per_page: { type: "number", description: "Results per page (default 20)." },
+            scroll_id: { type: "string", description: "Pagination cursor from previous response." },
+          },
+          required: ["person_id"],
+        },
+      },
     ]
   };
 });
@@ -1393,6 +1407,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
         };
+      }
+
+      case "loxo_get_candidate_activities": {
+        const { person_id, per_page, scroll_id } = args as any;
+
+        const params = new URLSearchParams();
+        params.append('person_id', person_id.toString());
+        if (per_page) params.append('per_page', per_page.toString());
+        if (scroll_id) params.append('scroll_id', scroll_id);
+
+        const apiResponse: any = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/person_events?${params.toString()}`
+        );
+
+        const items = apiResponse?.person_events || apiResponse?.events || apiResponse || [];
+        const toolResponse = {
+          results: items,
+          pagination: {
+            scroll_id: apiResponse?.scroll_id || null,
+            has_more: !!(apiResponse?.scroll_id),
+            total_count: apiResponse?.total_count || 0,
+            returned_count: Array.isArray(items) ? items.length : 0,
+          },
+        };
+
+        const { text } = truncateResponse(JSON.stringify(toolResponse, null, 2));
+        return { content: [{ type: "text", text }] };
       }
 
       default:
