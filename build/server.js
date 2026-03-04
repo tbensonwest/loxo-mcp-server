@@ -871,10 +871,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     // For now, let's keep it simple and assume it's part of the main query string or Loxo handles it.
                     // A more robust solution would require knowing Loxo's exact Lucene schema.
                     // Let's assume for now that if 'company' is provided, it's added to the general query.
-                    constructedQueryParts.push(`current_company_name_text:"${company.replace(/[\\\"]/g, '\\$&')}"`);
+                    constructedQueryParts.push(`current_company_name_text:"${company.replace(/[\\"]/g, '\\$&')}"`);
                 }
                 if (title) {
-                    constructedQueryParts.push(`current_title_text:"${title.replace(/[\\\"]/g, '\\$&')}"`); // Example
+                    constructedQueryParts.push(`current_title_text:"${title.replace(/[\\"]/g, '\\$&')}"`); // Example
                 }
                 const finalQueryString = constructedQueryParts.length > 0 ? constructedQueryParts.join(' AND ') : (query ? query : '*:*');
                 searchParams.append('query', finalQueryString);
