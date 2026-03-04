@@ -181,4 +181,113 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.content[0].text).toContain('Acme Corp');
     });
   });
+
+  // ─── loxo_create_candidate ────────────────────────────────────────────────
+
+  describe('loxo_create_candidate', () => {
+    it('creates candidate and returns the new record', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: () => Promise.resolve(JSON.stringify({ id: '99', name: 'TEST - Jane Doe', title: 'Engineer' })),
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane Doe',
+        email: 'test-jane@example.com',
+        current_title: 'Engineer',
+        tags: 'test-record,ci-test',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('TEST - Jane Doe');
+    });
+
+    it('returns error when required name is missing', async () => {
+      const result = await callTool(client, 'loxo_create_candidate', {
+        email: 'no-name@example.com',
+      });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  // ─── loxo_update_candidate ────────────────────────────────────────────────
+
+  describe('loxo_update_candidate', () => {
+    it('updates candidate and returns updated record', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: () => Promise.resolve(JSON.stringify({ id: '42', name: 'Jane Smith', title: 'Senior Engineer' })),
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        current_title: 'Senior Engineer',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Senior Engineer');
+    });
+
+    it('returns error when only id is provided (empty body guard)', async () => {
+      const result = await callTool(client, 'loxo_update_candidate', { id: '42' });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('No fields provided to update');
+    });
+  });
+
+  // ─── loxo_apply_to_job ────────────────────────────────────────────────────
+
+  describe('loxo_apply_to_job', () => {
+    it('adds candidate to job pipeline', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: () => Promise.resolve(JSON.stringify({ id: 1, person_id: '42', job_id: '100' })),
+      }));
+      const result = await callTool(client, 'loxo_apply_to_job', {
+        job_id: '100',
+        person_id: '42',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('"person_id": "42"');
+    });
+
+    it('returns error when job_id is missing', async () => {
+      let caughtError: unknown;
+      let result: Awaited<ReturnType<typeof callTool>> | undefined;
+      try {
+        result = await callTool(client, 'loxo_apply_to_job', { person_id: '42' });
+      } catch (err) {
+        caughtError = err;
+      }
+      // Either the MCP SDK rejects the request at the protocol level (thrown error)
+      // or the handler catches the fetch failure and returns isError: true
+      if (result !== undefined) {
+        expect(result.isError).toBe(true);
+      } else {
+        expect(caughtError).toBeDefined();
+      }
+    });
+  });
+
+  // ─── loxo_log_activity ────────────────────────────────────────────────────
+
+  describe('loxo_log_activity', () => {
+    it('logs activity successfully', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        text: () => Promise.resolve(JSON.stringify({ id: 5, activity_type_id: '1', notes: 'Test call logged' })),
+      }));
+      const result = await callTool(client, 'loxo_log_activity', {
+        person_id: '42',
+        activity_type_id: '1',
+        notes: 'Test call logged',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Test call logged');
+    });
+  });
 });
