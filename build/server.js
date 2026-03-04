@@ -29,6 +29,14 @@ function formatResponse(data, format = 'json') {
     }
     return JSON.stringify(data, null, 2);
 }
+// Validates that a value is a numeric string before use in URL paths.
+// Throws with a user-friendly message if invalid, caught by the global handler.
+function requireNumericId(value, fieldName) {
+    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+        throw new Error(`Invalid ${fieldName}: expected a numeric ID, got "${value}"`);
+    }
+    return value;
+}
 // Helper function to create actionable error messages
 function formatApiError(status, statusText, responseBody, endpoint) {
     switch (status) {
@@ -67,7 +75,7 @@ async function makeRequest(endpoint, options = {}) {
             console.error('API Response:', {
                 status: response.status,
                 statusText: response.statusText,
-                body: responseText
+                body: '[redacted]'
             });
             // Throw actionable error message
             const errorMessage = formatApiError(response.status, response.statusText, responseText, endpoint);
@@ -861,10 +869,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     // For now, let's keep it simple and assume it's part of the main query string or Loxo handles it.
                     // A more robust solution would require knowing Loxo's exact Lucene schema.
                     // Let's assume for now that if 'company' is provided, it's added to the general query.
-                    constructedQueryParts.push(`current_company_name_text:"${company}"`); // Example, might need adjustment
+                    constructedQueryParts.push(`current_company_name_text:"${company.replace(/"/g, '\\"')}"`);
                 }
-                if (title) { // Similar for title
-                    constructedQueryParts.push(`current_title_text:"${title}"`); // Example
+                if (title) {
+                    constructedQueryParts.push(`current_title_text:"${title.replace(/"/g, '\\"')}"`); // Example
                 }
                 const finalQueryString = constructedQueryParts.length > 0 ? constructedQueryParts.join(' AND ') : (query ? query : '*:*');
                 searchParams.append('query', finalQueryString);
@@ -913,6 +921,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_candidate": {
                 const { id, response_format = 'json' } = args;
+                requireNumericId(id, 'id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -960,6 +969,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_job": {
                 const { id, response_format = 'json' } = args;
+                requireNumericId(id, 'id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/${id}`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1019,6 +1029,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_company_details": {
                 const { company_id, response_format = 'json' } = args;
+                requireNumericId(company_id, 'company_id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/companies/${company_id}`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1037,6 +1048,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_person_emails": {
                 const { id: person_id, response_format = 'json' } = args;
+                requireNumericId(person_id, 'id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/emails`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1046,6 +1058,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_person_phones": {
                 const { id: person_id, response_format = 'json' } = args;
+                requireNumericId(person_id, 'id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/phones`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1055,6 +1068,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_list_person_job_profiles": {
                 const { id: person_id, response_format = 'json' } = args;
+                requireNumericId(person_id, 'id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1064,6 +1078,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_person_job_profile_detail": {
                 const { person_id, resource_id: job_profile_id, response_format = 'json' } = args;
+                requireNumericId(person_id, 'person_id');
+                requireNumericId(job_profile_id, 'resource_id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/job_profiles/${job_profile_id}`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1073,6 +1089,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_list_person_education_profiles": {
                 const { id: person_id, response_format = 'json' } = args;
+                requireNumericId(person_id, 'id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1082,6 +1099,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_person_education_profile_detail": {
                 const { person_id, resource_id: education_profile_id, response_format = 'json' } = args;
+                requireNumericId(person_id, 'person_id');
+                requireNumericId(education_profile_id, 'resource_id');
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${person_id}/education_profiles/${education_profile_id}`);
                 const formatted = formatResponse(response, response_format);
                 const { text } = truncateResponse(formatted);
@@ -1209,6 +1228,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_job_pipeline": {
                 const { job_id, per_page, scroll_id, response_format = 'json' } = args;
+                requireNumericId(job_id, 'job_id');
                 const params = new URLSearchParams();
                 if (per_page)
                     params.append('per_page', per_page.toString());
@@ -1232,6 +1252,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_apply_to_job": {
                 const { job_id, person_id } = args;
+                requireNumericId(job_id, 'job_id');
+                requireNumericId(person_id, 'person_id');
                 const formData = new URLSearchParams();
                 formData.append('job_contact[person_id]', person_id.toString());
                 const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/job_contacts`, {
