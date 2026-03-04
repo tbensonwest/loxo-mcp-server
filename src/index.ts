@@ -985,6 +985,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id"],
         },
       },
+      {
+        name: "loxo_get_job_pipeline",
+        description: "Get all candidates in the pipeline for a specific job, with their current stage. Use for pipeline reviews — see who's at which stage, identify stalled candidates, and plan next actions. Example: 'Show me the pipeline for job 456' returns all candidates and their stage (sourced, screened, interviewing, offer, placed).",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            job_id: { type: "string", description: "The job ID (required)." },
+            per_page: { type: "number", description: "Results per page (default 20)." },
+            scroll_id: { type: "string", description: "Pagination cursor from previous response." },
+          },
+          required: ["job_id"],
+        },
+      },
     ]
   };
 });
@@ -1473,6 +1487,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
 
         const { text } = truncateResponse(JSON.stringify(brief, null, 2));
+        return { content: [{ type: "text", text }] };
+      }
+
+      case "loxo_get_job_pipeline": {
+        const { job_id, per_page, scroll_id } = args as any;
+
+        const params = new URLSearchParams();
+        if (per_page) params.append('per_page', per_page.toString());
+        if (scroll_id) params.append('scroll_id', scroll_id);
+
+        const apiResponse: any = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/job_contacts?${params.toString()}`
+        );
+
+        const contacts = apiResponse?.job_contacts || apiResponse?.contacts || apiResponse || [];
+        const toolResponse = {
+          job_id,
+          results: contacts,
+          pagination: {
+            scroll_id: apiResponse?.scroll_id || null,
+            has_more: !!(apiResponse?.scroll_id),
+            total_count: apiResponse?.total_count || 0,
+            returned_count: Array.isArray(contacts) ? contacts.length : 0,
+          },
+        };
+
+        const { text } = truncateResponse(JSON.stringify(toolResponse, null, 2));
         return { content: [{ type: "text", text }] };
       }
 
