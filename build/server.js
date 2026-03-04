@@ -29,13 +29,15 @@ function formatResponse(data, format = 'json') {
     }
     return JSON.stringify(data, null, 2);
 }
-// Validates that a value is a numeric string before use in URL paths.
-// Throws with a user-friendly message if invalid, caught by the global handler.
+// Validates that a value is a numeric ID before use in URL paths.
+// Accepts both string and number inputs. Throws with a user-friendly message
+// if invalid, caught by the global handler.
 function requireNumericId(value, fieldName) {
-    if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    const str = typeof value === 'number' ? String(value) : value;
+    if (typeof str !== 'string' || !/^\d+$/.test(str)) {
         throw new Error(`Invalid ${fieldName}: expected a numeric ID, got "${value}"`);
     }
-    return value;
+    return str;
 }
 // Helper function to create actionable error messages
 function formatApiError(status, statusText, responseBody, endpoint) {
@@ -869,10 +871,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                     // For now, let's keep it simple and assume it's part of the main query string or Loxo handles it.
                     // A more robust solution would require knowing Loxo's exact Lucene schema.
                     // Let's assume for now that if 'company' is provided, it's added to the general query.
-                    constructedQueryParts.push(`current_company_name_text:"${company.replace(/"/g, '\\"')}"`);
+                    constructedQueryParts.push(`current_company_name_text:"${company.replace(/[\\\"]/g, '\\$&')}"`);
                 }
                 if (title) {
-                    constructedQueryParts.push(`current_title_text:"${title.replace(/"/g, '\\"')}"`); // Example
+                    constructedQueryParts.push(`current_title_text:"${title.replace(/[\\\"]/g, '\\$&')}"`); // Example
                 }
                 const finalQueryString = constructedQueryParts.length > 0 ? constructedQueryParts.join(' AND ') : (query ? query : '*:*');
                 searchParams.append('query', finalQueryString);
@@ -1194,9 +1196,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_candidate_brief": {
                 const { id, response_format = 'json' } = args;
-                if (!/^\d+$/.test(id)) {
-                    return { content: [{ type: "text", text: "Invalid ID format. ID must be numeric." }], isError: true };
-                }
+                requireNumericId(id, 'id');
                 const [profileResult, emailsResult, phonesResult, activitiesResult] = await Promise.allSettled([
                     makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}`),
                     makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}/emails`),
