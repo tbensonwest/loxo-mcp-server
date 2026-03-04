@@ -145,7 +145,7 @@ const GetCompanyDetailsSchema = z.object({
 // Schema for list-users tool
 const ListUsersSchema = z.object({}); // No specific input parameters
 const EntityIdSchema = z.object({
-    id: z.string() // Represents person_id for these tools
+    id: z.string().regex(/^\d+$/, "ID must be numeric")
 });
 const PersonSubResourceIdSchema = z.object({
     person_id: z.string(),
@@ -162,7 +162,7 @@ const CreateCandidateSchema = z.object({
     tags: z.string().optional().describe("Comma-separated tags to apply (e.g. 'cv-import,sourced-march-2026')."),
 });
 const UpdateCandidateSchema = z.object({
-    id: z.string().describe("The candidate's person ID."),
+    id: z.string().regex(/^\d+$/, "ID must be numeric").describe("The candidate's person ID."),
     name: z.string().optional().describe("Full name."),
     email: z.string().optional().describe("Primary email address."),
     phone: z.string().optional().describe("Primary phone number."),
@@ -1175,12 +1175,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
             case "loxo_get_candidate_brief": {
                 const { id, response_format = 'json' } = args;
-                const [profile, emails, phones, activitiesResponse] = await Promise.all([
+                if (!/^\d+$/.test(id)) {
+                    return { content: [{ type: "text", text: "Invalid ID format. ID must be numeric." }], isError: true };
+                }
+                const [profileResult, emailsResult, phonesResult, activitiesResult] = await Promise.allSettled([
                     makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}`),
                     makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}/emails`),
                     makeRequest(`/${env.LOXO_AGENCY_SLUG}/people/${id}/phones`),
                     makeRequest(`/${env.LOXO_AGENCY_SLUG}/person_events?person_id=${id}&per_page=5`),
                 ]);
+                if (profileResult.status === 'rejected') {
+                    throw profileResult.reason;
+                }
+                const profile = profileResult.value;
+                const emails = emailsResult.status === 'fulfilled' ? emailsResult.value : [];
+                const phones = phonesResult.status === 'fulfilled' ? phonesResult.value : [];
+                const activitiesResponse = activitiesResult.status === 'fulfilled' ? activitiesResult.value : null;
                 const recentActivities = activitiesResponse?.person_events
                     || activitiesResponse?.events
                     || activitiesResponse

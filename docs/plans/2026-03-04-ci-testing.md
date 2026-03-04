@@ -21,7 +21,7 @@
 **Step 1: Install dev dependencies**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm install --save-dev vitest @typescript-eslint/parser @typescript-eslint/eslint-plugin eslint
+npm install --save-dev vitest @typescript-eslint/parser @typescript-eslint/eslint-plugin eslint
 ```
 
 Expected: packages added to `devDependencies` in package.json.
@@ -81,7 +81,7 @@ process.env.LOXO_DOMAIN = 'app.loxo.co';
 **Step 6: Verify lint runs (no TS files changed yet, just checking config)**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm run lint
+npm run lint
 ```
 
 Expected: exits 0 or shows warnings (no errors that would block CI). If there are errors, note them — they'll be addressed in the next task.
@@ -140,7 +140,7 @@ main().catch((error) => {
 **Step 3: Build to verify the refactor compiles**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm run build
+npm run build
 ```
 
 Expected: exits 0. If TypeScript errors appear (e.g. missing imports in one file), fix them before proceeding.
@@ -229,7 +229,7 @@ describe('formatResponse', () => {
 **Step 2: Run tests**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm test
+npm test
 ```
 
 Expected: all 8 tests pass. If `truncateResponse` or `formatResponse` aren't exported from `src/server.ts`, the import will fail — go back and add the export.
@@ -440,7 +440,7 @@ describe('Loxo MCP tool handlers', () => {
 **Step 2: Run tests**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm test
+npm test
 ```
 
 Expected: all tests pass. Common failures and fixes:
@@ -552,7 +552,7 @@ Inside the outer `describe('Loxo MCP tool handlers', ...)` block, after the last
 **Step 2: Run full test suite**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm test
+npm test
 ```
 
 Expected: all tests pass. If the `loxo_apply_to_job` missing-param test fails (i.e. the tool doesn't validate required params), note it — the MCP SDK may return a protocol-level error rather than an `isError` tool response; adjust the assertion accordingly.
@@ -574,7 +574,7 @@ git commit -m "test: add handler tests for write tools"
 **Step 1: Create the workflows directory**
 
 ```bash
-mkdir -p /home/tbizzlewiz/code/loxo-mcp-server/.github/workflows
+mkdir -p .github/workflows
 ```
 
 **Step 2: Create `.github/workflows/ci.yml`**
@@ -622,7 +622,7 @@ Note on env vars: the `LOXO_API_KEY` and `LOXO_AGENCY_SLUG` values are fake — 
 **Step 3: Build and test locally to confirm everything works before pushing**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm run lint && npm run build && npm test
+npm run lint && npm run build && npm test
 ```
 
 Expected: all three commands exit 0.
@@ -644,7 +644,7 @@ git commit -m "ci: add GitHub Actions workflow for lint, build, and test on PRs"
 **Step 1: Full clean run**
 
 ```bash
-cd /home/tbizzlewiz/code/loxo-mcp-server && npm run lint && npm run build && npm test
+npm run lint && npm run build && npm test
 ```
 
 Expected: all exit 0. Fix anything that doesn't.
