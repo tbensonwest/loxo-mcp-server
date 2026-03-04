@@ -969,6 +969,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             person_id: { type: "string", description: "The candidate's person ID (required)." },
             per_page: { type: "number", description: "Results per page (default 20)." },
             scroll_id: { type: "string", description: "Pagination cursor from previous response." },
+            response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
           },
           required: ["person_id"],
         },
@@ -981,6 +982,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           type: "object",
           properties: {
             id: { type: "string", description: "The candidate's person ID (required)." },
+            response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
           },
           required: ["id"],
         },
@@ -995,6 +997,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             job_id: { type: "string", description: "The job ID (required)." },
             per_page: { type: "number", description: "Results per page (default 20)." },
             scroll_id: { type: "string", description: "Pagination cursor from previous response." },
+            response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
           },
           required: ["job_id"],
         },
@@ -1435,6 +1438,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
         if (tags) formData.append('person[tag_list]', tags);
 
+        if (formData.toString() === '') {
+          return {
+            content: [{ type: "text", text: "No fields provided to update. Supply at least one optional field alongside id." }],
+            isError: true
+          };
+        }
+
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people/${id}`,
           {
@@ -1449,7 +1459,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_get_candidate_activities": {
-        const { person_id, per_page, scroll_id } = args as any;
+        const { person_id, per_page, scroll_id, response_format = 'json' } = args as any;
 
         const params = new URLSearchParams();
         params.append('person_id', person_id.toString());
@@ -1471,12 +1481,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         };
 
-        const { text } = truncateResponse(JSON.stringify(toolResponse, null, 2));
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return { content: [{ type: "text", text }] };
       }
 
       case "loxo_get_candidate_brief": {
-        const { id } = args as any;
+        const { id, response_format = 'json' } = args as any;
 
         const [profile, emails, phones, activitiesResponse] = await Promise.all([
           makeRequest<Candidate>(`/${env.LOXO_AGENCY_SLUG}/people/${id}`),
@@ -1499,12 +1510,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             : [],
         };
 
-        const { text } = truncateResponse(JSON.stringify(brief, null, 2));
+        const formatted = formatResponse(brief, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return { content: [{ type: "text", text }] };
       }
 
       case "loxo_get_job_pipeline": {
-        const { job_id, per_page, scroll_id } = args as any;
+        const { job_id, per_page, scroll_id, response_format = 'json' } = args as any;
 
         const params = new URLSearchParams();
         if (per_page) params.append('per_page', per_page.toString());
@@ -1526,7 +1538,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         };
 
-        const { text } = truncateResponse(JSON.stringify(toolResponse, null, 2));
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
         return { content: [{ type: "text", text }] };
       }
 
