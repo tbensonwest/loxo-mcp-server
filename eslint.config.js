@@ -8,6 +8,11 @@ export default tseslint.config(
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      'no-unused-vars': 'off',
+      'prefer-const': 'warn',
+      'no-case-declarations': 'warn',
+      'preserve-caught-error': 'warn',
     },
   }
 );
