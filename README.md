@@ -1,8 +1,23 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/tbensonwest-loxo-mcp-server-badge.png)](https://mseep.ai/app/tbensonwest-loxo-mcp-server)
+![CI](https://github.com/tbensonwest/loxo-mcp-server/actions/workflows/ci.yml/badge.svg)
+
 # Loxo MCP Server
 
 A Model Context Protocol (MCP) server that provides tools for interacting with the Loxo recruitment platform API (v1.3.1). This server enables AI assistants to perform various recruitment-related tasks such as managing candidates, jobs, companies, and activities.
 
+<a href="https://glama.ai/mcp/servers/rj00ooup46"><img width="380" height="200" src="https://glama.ai/mcp/servers/rj00ooup46/badge" alt="Loxo Server MCP server" /></a>
+
 ## Installation
+
+### Option 0: Install via Smithery (easiest)
+
+Install automatically for Claude Desktop via [Smithery](https://smithery.ai/server/loxo-mcp-server):
+
+```bash
+npx -y @smithery/cli install loxo-mcp-server --client claude
+```
+
+[![smithery badge](https://smithery.ai/badge/loxo-mcp-server)](https://smithery.ai/server/loxo-mcp-server)
 
 ### Option 1: Local Installation
 
@@ -332,6 +347,15 @@ query='NOT _exists_:location'
 ## Available Tools
 
 The server provides the following tools for AI assistants:
+
+### New in v2
+
+- `loxo_create_candidate` — Create a new candidate from a CV or other source
+- `loxo_update_candidate` — Update an existing candidate's details
+- `loxo_get_candidate_brief` — Get full profile + contacts + recent activities in one call (use before drafting outreach)
+- `loxo_get_candidate_activities` — Get full activity history for a candidate
+- `loxo_get_job_pipeline` — See all candidates on a job and their pipeline stage
+- `loxo_apply_to_job` — Add a candidate to a job's pipeline
 
 ### Activity & Event Management
 - `get-activity-types` - List available activity types
