@@ -223,19 +223,38 @@ describe('Loxo MCP tool handlers', () => {
   // ─── loxo_update_candidate ────────────────────────────────────────────────
 
   describe('loxo_update_candidate', () => {
-    it('updates candidate and returns updated record', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: () => Promise.resolve(JSON.stringify({ id: '42', name: 'Jane Smith', title: 'Senior Engineer' })),
+    it('sends PUT with person[all_raw_tags][] array and person[custom_hierarchy_1][]', async () => {
+      let capturedMethod = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedMethod = opts?.method || 'GET';
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 42, name: 'Jane Smith', all_raw_tags: 'debt-advisory, sourced', custom_hierarchy_1: [{ id: 5704030, value: 'Debt Advisory' }] }
+          })),
+        });
       }));
       const result = await callTool(client, 'loxo_update_candidate', {
         id: '42',
-        current_title: 'Senior Engineer',
+        current_title: 'Senior Analyst',
+        tags: ['debt-advisory', 'sourced'],
+        skillset_ids: [5704030],
+        person_type_id: 80073,
+        source_type_id: 1206583,
       });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('Senior Engineer');
+      expect(capturedMethod).toBe('PUT');
+      // Tags must use array notation person[all_raw_tags][]=x
+      expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=debt-advisory');
+      expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=sourced');
+      // Skillsets use custom_hierarchy_1
+      expect(capturedBody).toContain('person%5Bcustom_hierarchy_1%5D%5B%5D=5704030');
+      // Person type uses singular form
+      expect(capturedBody).toContain('person%5Bperson_type_id%5D=80073');
+      // Source type
+      expect(capturedBody).toContain('person%5Bsource_type_id%5D=1206583');
     });
 
     it('returns error when only id is provided (empty body guard)', async () => {

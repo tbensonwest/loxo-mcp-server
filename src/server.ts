@@ -414,13 +414,16 @@ const CreateCandidateSchema = z.object({
 const UpdateCandidateSchema = z.object({
   id: z.string().regex(/^\d+$/, "ID must be numeric").describe("The candidate's person ID."),
   name: z.string().optional().describe("Full name."),
-  email: z.string().optional().describe("Primary email address."),
-  phone: z.string().optional().describe("Primary phone number."),
+  email: z.string().optional().describe("Email address to add."),
+  phone: z.string().optional().describe("Phone number to add."),
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
-  person_type_id: z.number().int().optional().describe("Person type ID."),
-  tags: z.string().optional().describe("Comma-separated tags to apply."),
+  tags: z.array(z.string()).optional().describe("Tags to set (replaces existing). E.g. ['cv-import', 'debt-advisory']."),
+  skillset_ids: z.array(z.number().int()).optional().describe("Skillset hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5704030] for Debt Advisory."),
+  sector_ids: z.array(z.number().int()).optional().describe("Sector hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5690364] for Financial Services."),
+  person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
+  source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
 });
 
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
@@ -947,20 +950,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_update_candidate",
-        description: "Update an existing candidate's record in Loxo. Use when a CV belongs to someone already in the system and you want to refresh their details. Provide only the fields you want to change — all parameters are optional except id.",
+        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string", description: "Candidate person ID (required)." },
             name: { type: "string", description: "Full name." },
-            email: { type: "string", description: "Primary email address." },
-            phone: { type: "string", description: "Primary phone number." },
+            email: { type: "string", description: "Email address to add." },
+            phone: { type: "string", description: "Phone number to add." },
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
-            person_type_id: { type: "number", description: "Person type ID." },
-            tags: { type: "string", description: "Comma-separated tags." },
+            tags: { type: "array", items: { type: "string" }, description: "Tags to set. E.g. ['cv-import', 'debt-advisory']." },
+            skillset_ids: { type: "array", items: { type: "number" }, description: "Skillset IDs from loxo_list_skillsets. E.g. [5704030] = Debt Advisory." },
+            sector_ids: { type: "array", items: { type: "number" }, description: "Sector IDs from loxo_list_skillsets. E.g. [5690364] = Financial Services." },
+            person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
+            source_type_id: { type: "number", description: "Source type ID. 1206583=LinkedIn, 1206592=API." },
           },
           required: ["id"],
         },
@@ -1441,17 +1447,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, person_type_id, tags } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
-        if (email) formData.append('person[email_addresses][][value]', email);
-        if (phone) formData.append('person[phone_numbers][][value]', phone);
+        if (email) formData.append('person[email]', email);
+        if (phone) formData.append('person[phone]', phone);
         if (current_title) formData.append('person[title]', current_title);
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
-        if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
-        if (tags) formData.append('person[tag_list]', tags);
+        if (person_type_id) formData.append('person[person_type_id]', person_type_id.toString());
+        if (source_type_id) formData.append('person[source_type_id]', source_type_id.toString());
+        if (tags) {
+          for (const tag of tags) {
+            formData.append('person[all_raw_tags][]', tag);
+          }
+        }
+        if (skillset_ids) {
+          for (const sid of skillset_ids) {
+            formData.append('person[custom_hierarchy_1][]', sid.toString());
+          }
+        }
+        if (sector_ids) {
+          for (const sid of sector_ids) {
+            formData.append('person[custom_hierarchy_2][]', sid.toString());
+          }
+        }
 
         if (formData.toString() === '') {
           return {
@@ -1463,7 +1484,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people/${id}`,
           {
-            method: 'PATCH',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
           }
