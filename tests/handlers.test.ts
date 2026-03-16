@@ -266,30 +266,42 @@ describe('Loxo MCP tool handlers', () => {
 
   // ─── loxo_apply_to_job ────────────────────────────────────────────────────
 
-  describe('loxo_apply_to_job', () => {
-    it('adds candidate to job pipeline', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: () => Promise.resolve(JSON.stringify({ id: 1, person_id: '42', job_id: '100' })),
+  describe('loxo_add_to_pipeline', () => {
+    it('creates person_event with activity_type_id 1550055 (Added to Job)', async () => {
+      let capturedUrl = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person_event: { id: 123, person_id: 42, job_id: 100, activity_type_id: 1550055, notes: 'Sourced from CV search' }
+          })),
+        });
       }));
-      const result = await callTool(client, 'loxo_apply_to_job', {
+      const result = await callTool(client, 'loxo_add_to_pipeline', {
         job_id: '100',
         person_id: '42',
+        notes: 'Sourced from CV search',
       });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('"person_id": "42"');
+      // Must hit person_events endpoint, NOT jobs/{id}/contacts
+      expect(capturedUrl).toContain('/person_events');
+      expect(capturedUrl).not.toContain('/contacts');
+      // Must include the "Added to Job" activity type
+      expect(capturedBody).toContain('person_event%5Bactivity_type_id%5D=1550055');
+      expect(capturedBody).toContain('person_event%5Bjob_id%5D=100');
+      expect(capturedBody).toContain('person_event%5Bperson_id%5D=42');
     });
 
     it('returns error when job_id is missing', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        text: () => Promise.resolve(JSON.stringify({ error: 'job_id is required' })),
-      }));
-      const result = await callTool(client, 'loxo_apply_to_job', { person_id: '42' });
+      const result = await callTool(client, 'loxo_add_to_pipeline', { person_id: '42' });
+      expect(result.isError).toBe(true);
+    });
+
+    it('returns error when person_id is missing', async () => {
+      const result = await callTool(client, 'loxo_add_to_pipeline', { job_id: '100' });
       expect(result.isError).toBe(true);
     });
   });

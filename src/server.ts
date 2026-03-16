@@ -426,6 +426,12 @@ const UpdateCandidateSchema = z.object({
   source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
 });
 
+const AddToPipelineSchema = z.object({
+  job_id: z.string().regex(/^\d+$/, "job_id must be numeric").describe("The job ID to add the candidate to."),
+  person_id: z.string().regex(/^\d+$/, "person_id must be numeric").describe("The candidate's person ID."),
+  notes: z.string().optional().describe("Optional notes (e.g. 'Sourced from LinkedIn applications')."),
+});
+
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
 type SearchArgs = z.infer<typeof SearchSchema>; // Generic search, might deprecate if specific ones cover all uses
 type TypeSearchCandidatesArgs = z.infer<typeof SearchCandidatesSchema>;
@@ -828,7 +834,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_log_activity",
-        description: "Log a completed activity (call, email, interview) that already happened. Uses current timestamp automatically. Use loxo_get_activity_types first to get correct activity_type_id. Example: Just finished phone screen with candidate - log it with activity_type_id for 'phone screen', person_id, and notes about the conversation. Optionally link to job_id or company_id.",
+        description: "Log a completed activity (call, email, interview) that already happened. Uses current timestamp automatically. Use loxo_get_activity_types first to get correct activity_type_id. Example: Just finished phone screen with candidate - log it with activity_type_id for 'phone screen', person_id, and notes about the conversation. Optionally link to job_id or company_id. Note: activity_type_id=1550055 ('Added to Job') adds candidates to a job pipeline — for that, prefer loxo_add_to_pipeline which handles the correct type automatically.",
         inputSchema: {
           type: "object",
           properties: {
@@ -1015,14 +1021,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "loxo_apply_to_job",
-        description: "Add a candidate to a job's pipeline. Use after identifying a good candidate match to assign them to a role. Example: After searching for and finding a suitable candidate, call this to add them to the job pipeline so they appear in loxo_get_job_pipeline.",
+        name: "loxo_add_to_pipeline",
+        description: "Add a candidate to a job's pipeline. Creates an 'Added to Job' activity event which places the candidate in the pipeline at the first stage. Use after identifying a good candidate match. The candidate will then appear in loxo_get_job_pipeline results. Note: this is NOT the same as loxo_log_activity — this tool specifically handles pipeline addition with the correct activity type.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
             job_id: { type: "string", description: "The job ID (required)." },
             person_id: { type: "string", description: "The candidate's person ID (required)." },
+            notes: { type: "string", description: "Optional notes about why the candidate was added." },
           },
           required: ["job_id", "person_id"],
         },
@@ -1592,16 +1599,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: "text", text }] };
       }
 
-      case "loxo_apply_to_job": {
-        const { job_id, person_id } = args as any;
-        requireNumericId(job_id, 'job_id');
-        requireNumericId(person_id, 'person_id');
+      case "loxo_add_to_pipeline": {
+        const { job_id, person_id, notes } = AddToPipelineSchema.parse(args);
 
         const formData = new URLSearchParams();
-        formData.append('person_id', person_id.toString());
+        formData.append('person_event[person_id]', person_id);
+        formData.append('person_event[job_id]', job_id);
+        formData.append('person_event[activity_type_id]', '1550055'); // "Added to Job"
+        if (notes) formData.append('person_event[notes]', notes);
 
         const response = await makeRequest(
-          `/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/contacts`,
+          `/${env.LOXO_AGENCY_SLUG}/person_events`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
