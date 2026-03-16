@@ -13,7 +13,7 @@ const env = validateEnv();
 const LOXO_API_BASE = `https://${env.LOXO_DOMAIN}/api`;
 
 // MCP Best Practice: Character limit for responses to prevent overwhelming context
-const CHARACTER_LIMIT = 25000;
+const CHARACTER_LIMIT = 100000;
 
 // Helper function to truncate responses with clear messaging
 function truncateResponse(content: string, limit: number = CHARACTER_LIMIT): { text: string; wasTruncated: boolean } {
