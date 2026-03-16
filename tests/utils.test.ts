@@ -10,11 +10,11 @@ describe('truncateResponse', () => {
   });
 
   it('truncates text that exceeds the limit', () => {
-    const longText = 'a'.repeat(30000);
+    const longText = 'a'.repeat(150000);
     const result = truncateResponse(longText);
     expect(result.wasTruncated).toBe(true);
     expect(result.text).toContain('[Response truncated');
-    expect(result.text.length).toBeLessThan(30000);
+    expect(result.text.length).toBeLessThan(150000);
   });
 
   it('respects a custom limit', () => {
