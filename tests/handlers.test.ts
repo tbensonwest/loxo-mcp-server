@@ -384,4 +384,41 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.content[0].text).toContain('TMT');
     });
   });
+
+  // ─── loxo_upload_resume ─────────────────────────────────────────────────
+
+  describe('loxo_upload_resume', () => {
+    it('uploads resume to /people/{id}/resumes endpoint', async () => {
+      let capturedUrl = '';
+      let capturedBody: any = null;
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedBody = opts?.body;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            id: 12345, name: 'cv.pdf', person_id: 42, created_at: '2026-03-16T12:00:00Z'
+          })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_upload_resume', {
+        person_id: '42',
+        file_name: 'cv.pdf',
+        file_content_base64: Buffer.from('fake pdf content').toString('base64'),
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('/people/42/resumes');
+      // Body should be FormData (not URLSearchParams)
+      expect(capturedBody).toBeInstanceOf(FormData);
+      expect(result.content[0].text).toContain('cv.pdf');
+    });
+
+    it('returns error when person_id is missing', async () => {
+      const result = await callTool(client, 'loxo_upload_resume', {
+        file_name: 'cv.pdf',
+        file_content_base64: Buffer.from('content').toString('base64'),
+      });
+      expect(result.isError).toBe(true);
+    });
+  });
 });

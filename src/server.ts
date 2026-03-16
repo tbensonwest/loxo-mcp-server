@@ -432,6 +432,12 @@ const AddToPipelineSchema = z.object({
   notes: z.string().optional().describe("Optional notes (e.g. 'Sourced from LinkedIn applications')."),
 });
 
+const UploadResumeSchema = z.object({
+  person_id: z.string().regex(/^\d+$/, "person_id must be numeric").describe("The candidate's person ID."),
+  file_name: z.string().describe("File name including extension (e.g. 'john-smith-cv.pdf')."),
+  file_content_base64: z.string().describe("Base64-encoded file content."),
+});
+
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
 type SearchArgs = z.infer<typeof SearchSchema>; // Generic search, might deprecate if specific ones cover all uses
 type TypeSearchCandidatesArgs = z.infer<typeof SearchCandidatesSchema>;
@@ -1035,6 +1041,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "loxo_upload_resume",
+        description: "Upload a CV/resume file to a candidate's Loxo profile. The file appears in the 'Resumes' section of their record. Accepts base64-encoded file content. Use after creating a candidate to attach their original CV. Example: Parse a CV, create the candidate with loxo_create_candidate, then upload the original file here.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            person_id: { type: "string", description: "The candidate's person ID (required)." },
+            file_name: { type: "string", description: "File name with extension, e.g. 'john-smith-cv.pdf' (required)." },
+            file_content_base64: { type: "string", description: "Base64-encoded file content (required)." },
+          },
+          required: ["person_id", "file_name", "file_content_base64"],
+        },
+      },
+      {
         name: "loxo_list_person_types",
         description: "List all person type options (e.g. Active Candidate, Prospect Candidate). Use to discover valid person_type_id values before calling loxo_update_candidate.",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
@@ -1632,6 +1652,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_upload_resume": {
+        const { person_id, file_name, file_content_base64 } = UploadResumeSchema.parse(args);
+
+        const fileBuffer = Buffer.from(file_content_base64, 'base64');
+        const blob = new Blob([fileBuffer]);
+        const formData = new FormData();
+        formData.append('document', blob, file_name);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/people/${person_id}/resumes`,
+          {
+            method: 'POST',
+            body: formData,
+            // Do NOT set Content-Type — fetch sets it automatically with boundary for FormData
           }
         );
         return {
