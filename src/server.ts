@@ -1034,6 +1034,24 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["job_id", "person_id"],
         },
       },
+      {
+        name: "loxo_list_person_types",
+        description: "List all person type options (e.g. Active Candidate, Prospect Candidate). Use to discover valid person_type_id values before calling loxo_update_candidate.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: { type: "object", properties: {}, required: [] },
+      },
+      {
+        name: "loxo_list_source_types",
+        description: "List all candidate source types (e.g. LinkedIn, API, Manual, Referral). Use to discover valid source_type_id values before calling loxo_create_candidate or loxo_update_candidate.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: { type: "object", properties: {}, required: [] },
+      },
+      {
+        name: "loxo_list_skillsets",
+        description: "List all Skillset and Sector Experience hierarchy options with their IDs. Returns two sections: 'skillsets' (e.g. Debt Advisory, M&A/Lead Advisory, Transaction Services) and 'sectors' (e.g. TMT, Financial Services, Healthcare). Use the IDs with loxo_update_candidate's skillset_ids and sector_ids parameters.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: { type: "object", properties: {}, required: [] },
+      },
     ]
   };
 });
@@ -1616,6 +1634,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             body: formData.toString(),
           }
         );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_person_types": {
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/person_types`);
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_source_types": {
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/source_types`);
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_skillsets": {
+        const [skillsetResult, sectorResult] = await Promise.all([
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/dynamic_fields/2602521`),
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/dynamic_fields/2602522`),
+        ]);
+
+        const response = {
+          skillsets: (skillsetResult?.hierarchies || []).map((h: any) => ({ id: h.id, name: h.name })),
+          sectors: (sectorResult?.hierarchies || []).map((h: any) => ({ id: h.id, name: h.name })),
+        };
         return {
           content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
         };

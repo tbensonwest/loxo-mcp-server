@@ -325,4 +325,63 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.content[0].text).toContain('Test call logged');
     });
   });
+
+  // ─── loxo_list_person_types ─────────────────────────────────────────────
+
+  describe('loxo_list_person_types', () => {
+    it('returns person types list', async () => {
+      mockFetch([
+        { id: 80073, name: 'Active Candidate' },
+        { id: 78122, name: 'Prospect Candidate' },
+      ]);
+      const result = await callTool(client, 'loxo_list_person_types', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Active Candidate');
+      expect(result.content[0].text).toContain('Prospect Candidate');
+    });
+  });
+
+  // ─── loxo_list_source_types ─────────────────────────────────────────────
+
+  describe('loxo_list_source_types', () => {
+    it('returns source types list', async () => {
+      mockFetch({ source_types: [
+        { id: 1206583, name: 'LinkedIn', active: true },
+        { id: 1206592, name: 'API', active: true },
+      ]});
+      const result = await callTool(client, 'loxo_list_source_types', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('LinkedIn');
+      expect(result.content[0].text).toContain('API');
+    });
+  });
+
+  // ─── loxo_list_skillsets ────────────────────────────────────────────────
+
+  describe('loxo_list_skillsets', () => {
+    it('returns skillset and sector hierarchies', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        let data: unknown;
+        if (url.includes('2602521')) {
+          data = { id: 2602521, name: 'Skillset', hierarchies: [
+            { id: 5704030, name: 'Debt Advisory', hierarchies: [] },
+            { id: 5690346, name: 'M&A/Lead Advisory', hierarchies: [] },
+          ]};
+        } else {
+          data = { id: 2602522, name: 'Sector Experience', hierarchies: [
+            { id: 5690362, name: 'TMT', hierarchies: [] },
+            { id: 5690364, name: 'Financial Services', hierarchies: [] },
+          ]};
+        }
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify(data)),
+        });
+      }));
+      const result = await callTool(client, 'loxo_list_skillsets', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Debt Advisory');
+      expect(result.content[0].text).toContain('TMT');
+    });
+  });
 });
