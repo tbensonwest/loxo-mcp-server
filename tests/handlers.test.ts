@@ -185,21 +185,31 @@ describe('Loxo MCP tool handlers', () => {
   // ─── loxo_create_candidate ────────────────────────────────────────────────
 
   describe('loxo_create_candidate', () => {
-    it('creates candidate and returns the new record', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: () => Promise.resolve(JSON.stringify({ id: '99', name: 'TEST - Jane Doe', title: 'Engineer' })),
+    it('sends person[email] and person[phone] (not bracket-array notation)', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 99, name: 'TEST - Jane Doe', emails: [{ value: 'jane@test.com' }], phones: [{ value: '447700900000' }] }
+          })),
+        });
       }));
       const result = await callTool(client, 'loxo_create_candidate', {
         name: 'TEST - Jane Doe',
-        email: 'test-jane@example.com',
-        current_title: 'Engineer',
-        tags: 'test-record,ci-test',
+        email: 'jane@test.com',
+        phone: '+447700900000',
+        current_title: 'Analyst',
+        current_company: 'Test Corp',
       });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('TEST - Jane Doe');
+      // Must use simple field names, NOT email_addresses[][value]
+      expect(capturedBody).toContain('person%5Bemail%5D=');     // person[email]
+      expect(capturedBody).toContain('person%5Bphone%5D=');     // person[phone]
+      expect(capturedBody).not.toContain('email_addresses');
+      expect(capturedBody).not.toContain('phone_numbers');
+      expect(capturedBody).not.toContain('source_type_id');
     });
 
     it('returns error when required name is missing', async () => {

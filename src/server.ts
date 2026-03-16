@@ -409,8 +409,6 @@ const CreateCandidateSchema = z.object({
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
-  person_type_id: z.number().int().optional().describe("Person type ID. Use to flag CV-sourced candidates (e.g. Prospect type) to prevent polluting active pipelines. Get valid IDs from loxo_list_users or Loxo settings."),
-  tags: z.string().optional().describe("Comma-separated tags to apply (e.g. 'cv-import,sourced-march-2026')."),
 });
 
 const UpdateCandidateSchema = z.object({
@@ -932,7 +930,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_create_candidate",
-        description: "Create a new candidate record in Loxo. Primary use case: after Claude parses a downloaded CV, call this to add the person to the database. Use person_type_id to assign a 'Prospect' or similar type so the candidate doesn't appear in active pipeline searches until qualified. Example: After parsing a CV, create with name, email, current_title, current_company, and person_type_id=<prospect_type_id>.",
+        description: "Create a new candidate record in Loxo with name, contact info, and current role. Source type is auto-set to 'API'. After creating, use loxo_update_candidate to set tags, skillsets, person_type, source_type, and sector — these fields require a separate PUT call. Example workflow: (1) loxo_create_candidate with name/email/phone/title/company, (2) loxo_update_candidate to add tags and skillset, (3) loxo_add_to_pipeline to add to a job.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -943,8 +941,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
-            person_type_id: { type: "number", description: "Person type ID for categorisation (e.g. Prospect). Use to prevent pipeline pollution." },
-            tags: { type: "string", description: "Comma-separated tags (e.g. 'cv-import,march-2026')." },
           },
           required: ["name"],
         },
@@ -1421,17 +1417,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_create_candidate": {
-        const { name, email, phone, current_title, current_company, location, person_type_id, tags } = CreateCandidateSchema.parse(args);
+        const { name, email, phone, current_title, current_company, location } = CreateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         formData.append('person[name]', name);
-        if (email) formData.append('person[email_addresses][][value]', email);
-        if (phone) formData.append('person[phone_numbers][][value]', phone);
+        if (email) formData.append('person[email]', email);
+        if (phone) formData.append('person[phone]', phone);
         if (current_title) formData.append('person[title]', current_title);
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
-        if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
-        if (tags) formData.append('person[tag_list]', tags);
 
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people`,
