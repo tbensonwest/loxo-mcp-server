@@ -409,20 +409,33 @@ const CreateCandidateSchema = z.object({
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
-  person_type_id: z.number().int().optional().describe("Person type ID. Use to flag CV-sourced candidates (e.g. Prospect type) to prevent polluting active pipelines. Get valid IDs from loxo_list_users or Loxo settings."),
-  tags: z.string().optional().describe("Comma-separated tags to apply (e.g. 'cv-import,sourced-march-2026')."),
 });
 
 const UpdateCandidateSchema = z.object({
   id: z.string().regex(/^\d+$/, "ID must be numeric").describe("The candidate's person ID."),
   name: z.string().optional().describe("Full name."),
-  email: z.string().optional().describe("Primary email address."),
-  phone: z.string().optional().describe("Primary phone number."),
+  email: z.string().optional().describe("Email address to add."),
+  phone: z.string().optional().describe("Phone number to add."),
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
-  person_type_id: z.number().int().optional().describe("Person type ID."),
-  tags: z.string().optional().describe("Comma-separated tags to apply."),
+  tags: z.array(z.string()).optional().describe("Tags to set (replaces existing). E.g. ['cv-import', 'debt-advisory']."),
+  skillset_ids: z.array(z.number().int()).optional().describe("Skillset hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5704030] for Debt Advisory."),
+  sector_ids: z.array(z.number().int()).optional().describe("Sector hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5690364] for Financial Services."),
+  person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
+  source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
+});
+
+const AddToPipelineSchema = z.object({
+  job_id: z.string().regex(/^\d+$/, "job_id must be numeric").describe("The job ID to add the candidate to."),
+  person_id: z.string().regex(/^\d+$/, "person_id must be numeric").describe("The candidate's person ID."),
+  notes: z.string().optional().describe("Optional notes (e.g. 'Sourced from LinkedIn applications')."),
+});
+
+const UploadResumeSchema = z.object({
+  person_id: z.string().regex(/^\d+$/, "person_id must be numeric").describe("The candidate's person ID."),
+  file_name: z.string().describe("File name including extension (e.g. 'john-smith-cv.pdf')."),
+  file_content_base64: z.string().describe("Base64-encoded file content."),
 });
 
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
@@ -827,7 +840,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_log_activity",
-        description: "Log a completed activity (call, email, interview) that already happened. Uses current timestamp automatically. Use loxo_get_activity_types first to get correct activity_type_id. Example: Just finished phone screen with candidate - log it with activity_type_id for 'phone screen', person_id, and notes about the conversation. Optionally link to job_id or company_id.",
+        description: "Log a completed activity (call, email, interview) that already happened. Uses current timestamp automatically. Use loxo_get_activity_types first to get correct activity_type_id. Example: Just finished phone screen with candidate - log it with activity_type_id for 'phone screen', person_id, and notes about the conversation. Optionally link to job_id or company_id. Note: activity_type_id=1550055 ('Added to Job') adds candidates to a job pipeline — for that, prefer loxo_add_to_pipeline which handles the correct type automatically.",
         inputSchema: {
           type: "object",
           properties: {
@@ -932,7 +945,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_create_candidate",
-        description: "Create a new candidate record in Loxo. Primary use case: after Claude parses a downloaded CV, call this to add the person to the database. Use person_type_id to assign a 'Prospect' or similar type so the candidate doesn't appear in active pipeline searches until qualified. Example: After parsing a CV, create with name, email, current_title, current_company, and person_type_id=<prospect_type_id>.",
+        description: "Create a new candidate record in Loxo with name, contact info, and current role. Source type is auto-set to 'API'. After creating, use loxo_update_candidate to set tags, skillsets, person_type, source_type, and sector — these fields require a separate PUT call. Example workflow: (1) loxo_create_candidate with name/email/phone/title/company, (2) loxo_update_candidate to add tags and skillset, (3) loxo_add_to_pipeline to add to a job.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -943,28 +956,29 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
-            person_type_id: { type: "number", description: "Person type ID for categorisation (e.g. Prospect). Use to prevent pipeline pollution." },
-            tags: { type: "string", description: "Comma-separated tags (e.g. 'cv-import,march-2026')." },
           },
           required: ["name"],
         },
       },
       {
         name: "loxo_update_candidate",
-        description: "Update an existing candidate's record in Loxo. Use when a CV belongs to someone already in the system and you want to refresh their details. Provide only the fields you want to change — all parameters are optional except id.",
+        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string", description: "Candidate person ID (required)." },
             name: { type: "string", description: "Full name." },
-            email: { type: "string", description: "Primary email address." },
-            phone: { type: "string", description: "Primary phone number." },
+            email: { type: "string", description: "Email address to add." },
+            phone: { type: "string", description: "Phone number to add." },
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
-            person_type_id: { type: "number", description: "Person type ID." },
-            tags: { type: "string", description: "Comma-separated tags." },
+            tags: { type: "array", items: { type: "string" }, description: "Tags to set. E.g. ['cv-import', 'debt-advisory']." },
+            skillset_ids: { type: "array", items: { type: "number" }, description: "Skillset IDs from loxo_list_skillsets. E.g. [5704030] = Debt Advisory." },
+            sector_ids: { type: "array", items: { type: "number" }, description: "Sector IDs from loxo_list_skillsets. E.g. [5690364] = Financial Services." },
+            person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
+            source_type_id: { type: "number", description: "Source type ID. 1206583=LinkedIn, 1206592=API." },
           },
           required: ["id"],
         },
@@ -1013,17 +1027,50 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
-        name: "loxo_apply_to_job",
-        description: "Add a candidate to a job's pipeline. Use after identifying a good candidate match to assign them to a role. Example: After searching for and finding a suitable candidate, call this to add them to the job pipeline so they appear in loxo_get_job_pipeline.",
+        name: "loxo_add_to_pipeline",
+        description: "Add a candidate to a job's pipeline. Creates an 'Added to Job' activity event which places the candidate in the pipeline at the first stage. Use after identifying a good candidate match. The candidate will then appear in loxo_get_job_pipeline results. Note: this is NOT the same as loxo_log_activity — this tool specifically handles pipeline addition with the correct activity type.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
             job_id: { type: "string", description: "The job ID (required)." },
             person_id: { type: "string", description: "The candidate's person ID (required)." },
+            notes: { type: "string", description: "Optional notes about why the candidate was added." },
           },
           required: ["job_id", "person_id"],
         },
+      },
+      {
+        name: "loxo_upload_resume",
+        description: "Upload a CV/resume file to a candidate's Loxo profile. The file appears in the 'Resumes' section of their record. Accepts base64-encoded file content. Use after creating a candidate to attach their original CV. Example: Parse a CV, create the candidate with loxo_create_candidate, then upload the original file here.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            person_id: { type: "string", description: "The candidate's person ID (required)." },
+            file_name: { type: "string", description: "File name with extension, e.g. 'john-smith-cv.pdf' (required)." },
+            file_content_base64: { type: "string", description: "Base64-encoded file content (required)." },
+          },
+          required: ["person_id", "file_name", "file_content_base64"],
+        },
+      },
+      {
+        name: "loxo_list_person_types",
+        description: "List all person type options (e.g. Active Candidate, Prospect Candidate). Use to discover valid person_type_id values before calling loxo_update_candidate.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: { type: "object", properties: {}, required: [] },
+      },
+      {
+        name: "loxo_list_source_types",
+        description: "List all candidate source types (e.g. LinkedIn, API, Manual, Referral). Use to discover valid source_type_id values before calling loxo_create_candidate or loxo_update_candidate.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: { type: "object", properties: {}, required: [] },
+      },
+      {
+        name: "loxo_list_skillsets",
+        description: "List all Skillset and Sector Experience hierarchy options with their IDs. Returns two sections: 'skillsets' (e.g. Debt Advisory, M&A/Lead Advisory, Transaction Services) and 'sectors' (e.g. TMT, Financial Services, Healthcare). Use the IDs with loxo_update_candidate's skillset_ids and sector_ids parameters.",
+        annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        inputSchema: { type: "object", properties: {}, required: [] },
       },
     ]
   };
@@ -1421,17 +1468,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_create_candidate": {
-        const { name, email, phone, current_title, current_company, location, person_type_id, tags } = CreateCandidateSchema.parse(args);
+        const { name, email, phone, current_title, current_company, location } = CreateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         formData.append('person[name]', name);
-        if (email) formData.append('person[email_addresses][][value]', email);
-        if (phone) formData.append('person[phone_numbers][][value]', phone);
+        if (email) formData.append('person[email]', email);
+        if (phone) formData.append('person[phone]', phone);
         if (current_title) formData.append('person[title]', current_title);
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
-        if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
-        if (tags) formData.append('person[tag_list]', tags);
 
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people`,
@@ -1447,17 +1492,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, person_type_id, tags } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
-        if (email) formData.append('person[email_addresses][][value]', email);
-        if (phone) formData.append('person[phone_numbers][][value]', phone);
+        if (email) formData.append('person[email]', email);
+        if (phone) formData.append('person[phone]', phone);
         if (current_title) formData.append('person[title]', current_title);
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
-        if (person_type_id) formData.append('person[person_type_ids][]', person_type_id.toString());
-        if (tags) formData.append('person[tag_list]', tags);
+        if (person_type_id) formData.append('person[person_type_id]', person_type_id.toString());
+        if (source_type_id) formData.append('person[source_type_id]', source_type_id.toString());
+        if (tags) {
+          for (const tag of tags) {
+            formData.append('person[all_raw_tags][]', tag);
+          }
+        }
+        if (skillset_ids) {
+          for (const sid of skillset_ids) {
+            formData.append('person[custom_hierarchy_1][]', sid.toString());
+          }
+        }
+        if (sector_ids) {
+          for (const sid of sector_ids) {
+            formData.append('person[custom_hierarchy_2][]', sid.toString());
+          }
+        }
 
         if (formData.toString() === '') {
           return {
@@ -1469,7 +1529,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people/${id}`,
           {
-            method: 'PATCH',
+            method: 'PUT',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
           }
@@ -1577,22 +1637,73 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: "text", text }] };
       }
 
-      case "loxo_apply_to_job": {
-        const { job_id, person_id } = args as any;
-        requireNumericId(job_id, 'job_id');
-        requireNumericId(person_id, 'person_id');
+      case "loxo_add_to_pipeline": {
+        const { job_id, person_id, notes } = AddToPipelineSchema.parse(args);
 
         const formData = new URLSearchParams();
-        formData.append('person_id', person_id.toString());
+        formData.append('person_event[person_id]', person_id);
+        formData.append('person_event[job_id]', job_id);
+        formData.append('person_event[activity_type_id]', '1550055'); // "Added to Job"
+        if (notes) formData.append('person_event[notes]', notes);
 
         const response = await makeRequest(
-          `/${env.LOXO_AGENCY_SLUG}/jobs/${job_id}/contacts`,
+          `/${env.LOXO_AGENCY_SLUG}/person_events`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
           }
         );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_upload_resume": {
+        const { person_id, file_name, file_content_base64 } = UploadResumeSchema.parse(args);
+
+        const fileBuffer = Buffer.from(file_content_base64, 'base64');
+        const blob = new Blob([fileBuffer]);
+        const formData = new FormData();
+        formData.append('document', blob, file_name);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/people/${person_id}/resumes`,
+          {
+            method: 'POST',
+            body: formData,
+            // Do NOT set Content-Type — fetch sets it automatically with boundary for FormData
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_person_types": {
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/person_types`);
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_source_types": {
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/source_types`);
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_skillsets": {
+        const [skillsetResult, sectorResult] = await Promise.all([
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/dynamic_fields/2602521`),
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/dynamic_fields/2602522`),
+        ]);
+
+        const response = {
+          skillsets: (skillsetResult?.hierarchies || []).map((h: any) => ({ id: h.id, name: h.name })),
+          sectors: (sectorResult?.hierarchies || []).map((h: any) => ({ id: h.id, name: h.name })),
+        };
         return {
           content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
         };

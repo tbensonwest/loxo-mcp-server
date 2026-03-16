@@ -185,21 +185,31 @@ describe('Loxo MCP tool handlers', () => {
   // ─── loxo_create_candidate ────────────────────────────────────────────────
 
   describe('loxo_create_candidate', () => {
-    it('creates candidate and returns the new record', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: () => Promise.resolve(JSON.stringify({ id: '99', name: 'TEST - Jane Doe', title: 'Engineer' })),
+    it('sends person[email] and person[phone] (not bracket-array notation)', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 99, name: 'TEST - Jane Doe', emails: [{ value: 'jane@test.com' }], phones: [{ value: '447700900000' }] }
+          })),
+        });
       }));
       const result = await callTool(client, 'loxo_create_candidate', {
         name: 'TEST - Jane Doe',
-        email: 'test-jane@example.com',
-        current_title: 'Engineer',
-        tags: 'test-record,ci-test',
+        email: 'jane@test.com',
+        phone: '+447700900000',
+        current_title: 'Analyst',
+        current_company: 'Test Corp',
       });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('TEST - Jane Doe');
+      // Must use simple field names, NOT email_addresses[][value]
+      expect(capturedBody).toContain('person%5Bemail%5D=');     // person[email]
+      expect(capturedBody).toContain('person%5Bphone%5D=');     // person[phone]
+      expect(capturedBody).not.toContain('email_addresses');
+      expect(capturedBody).not.toContain('phone_numbers');
+      expect(capturedBody).not.toContain('source_type_id');
     });
 
     it('returns error when required name is missing', async () => {
@@ -213,19 +223,38 @@ describe('Loxo MCP tool handlers', () => {
   // ─── loxo_update_candidate ────────────────────────────────────────────────
 
   describe('loxo_update_candidate', () => {
-    it('updates candidate and returns updated record', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: () => Promise.resolve(JSON.stringify({ id: '42', name: 'Jane Smith', title: 'Senior Engineer' })),
+    it('sends PUT with person[all_raw_tags][] array and person[custom_hierarchy_1][]', async () => {
+      let capturedMethod = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedMethod = opts?.method || 'GET';
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 42, name: 'Jane Smith', all_raw_tags: 'debt-advisory, sourced', custom_hierarchy_1: [{ id: 5704030, value: 'Debt Advisory' }] }
+          })),
+        });
       }));
       const result = await callTool(client, 'loxo_update_candidate', {
         id: '42',
-        current_title: 'Senior Engineer',
+        current_title: 'Senior Analyst',
+        tags: ['debt-advisory', 'sourced'],
+        skillset_ids: [5704030],
+        person_type_id: 80073,
+        source_type_id: 1206583,
       });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('Senior Engineer');
+      expect(capturedMethod).toBe('PUT');
+      // Tags must use array notation person[all_raw_tags][]=x
+      expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=debt-advisory');
+      expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=sourced');
+      // Skillsets use custom_hierarchy_1
+      expect(capturedBody).toContain('person%5Bcustom_hierarchy_1%5D%5B%5D=5704030');
+      // Person type uses singular form
+      expect(capturedBody).toContain('person%5Bperson_type_id%5D=80073');
+      // Source type
+      expect(capturedBody).toContain('person%5Bsource_type_id%5D=1206583');
     });
 
     it('returns error when only id is provided (empty body guard)', async () => {
@@ -237,30 +266,42 @@ describe('Loxo MCP tool handlers', () => {
 
   // ─── loxo_apply_to_job ────────────────────────────────────────────────────
 
-  describe('loxo_apply_to_job', () => {
-    it('adds candidate to job pipeline', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true,
-        status: 200,
-        statusText: 'OK',
-        text: () => Promise.resolve(JSON.stringify({ id: 1, person_id: '42', job_id: '100' })),
+  describe('loxo_add_to_pipeline', () => {
+    it('creates person_event with activity_type_id 1550055 (Added to Job)', async () => {
+      let capturedUrl = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person_event: { id: 123, person_id: 42, job_id: 100, activity_type_id: 1550055, notes: 'Sourced from CV search' }
+          })),
+        });
       }));
-      const result = await callTool(client, 'loxo_apply_to_job', {
+      const result = await callTool(client, 'loxo_add_to_pipeline', {
         job_id: '100',
         person_id: '42',
+        notes: 'Sourced from CV search',
       });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('"person_id": "42"');
+      // Must hit person_events endpoint, NOT jobs/{id}/contacts
+      expect(capturedUrl).toContain('/person_events');
+      expect(capturedUrl).not.toContain('/contacts');
+      // Must include the "Added to Job" activity type
+      expect(capturedBody).toContain('person_event%5Bactivity_type_id%5D=1550055');
+      expect(capturedBody).toContain('person_event%5Bjob_id%5D=100');
+      expect(capturedBody).toContain('person_event%5Bperson_id%5D=42');
     });
 
     it('returns error when job_id is missing', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-        text: () => Promise.resolve(JSON.stringify({ error: 'job_id is required' })),
-      }));
-      const result = await callTool(client, 'loxo_apply_to_job', { person_id: '42' });
+      const result = await callTool(client, 'loxo_add_to_pipeline', { person_id: '42' });
+      expect(result.isError).toBe(true);
+    });
+
+    it('returns error when person_id is missing', async () => {
+      const result = await callTool(client, 'loxo_add_to_pipeline', { job_id: '100' });
       expect(result.isError).toBe(true);
     });
   });
@@ -282,6 +323,102 @@ describe('Loxo MCP tool handlers', () => {
       });
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toContain('Test call logged');
+    });
+  });
+
+  // ─── loxo_list_person_types ─────────────────────────────────────────────
+
+  describe('loxo_list_person_types', () => {
+    it('returns person types list', async () => {
+      mockFetch([
+        { id: 80073, name: 'Active Candidate' },
+        { id: 78122, name: 'Prospect Candidate' },
+      ]);
+      const result = await callTool(client, 'loxo_list_person_types', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Active Candidate');
+      expect(result.content[0].text).toContain('Prospect Candidate');
+    });
+  });
+
+  // ─── loxo_list_source_types ─────────────────────────────────────────────
+
+  describe('loxo_list_source_types', () => {
+    it('returns source types list', async () => {
+      mockFetch({ source_types: [
+        { id: 1206583, name: 'LinkedIn', active: true },
+        { id: 1206592, name: 'API', active: true },
+      ]});
+      const result = await callTool(client, 'loxo_list_source_types', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('LinkedIn');
+      expect(result.content[0].text).toContain('API');
+    });
+  });
+
+  // ─── loxo_list_skillsets ────────────────────────────────────────────────
+
+  describe('loxo_list_skillsets', () => {
+    it('returns skillset and sector hierarchies', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        let data: unknown;
+        if (url.includes('2602521')) {
+          data = { id: 2602521, name: 'Skillset', hierarchies: [
+            { id: 5704030, name: 'Debt Advisory', hierarchies: [] },
+            { id: 5690346, name: 'M&A/Lead Advisory', hierarchies: [] },
+          ]};
+        } else {
+          data = { id: 2602522, name: 'Sector Experience', hierarchies: [
+            { id: 5690362, name: 'TMT', hierarchies: [] },
+            { id: 5690364, name: 'Financial Services', hierarchies: [] },
+          ]};
+        }
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify(data)),
+        });
+      }));
+      const result = await callTool(client, 'loxo_list_skillsets', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Debt Advisory');
+      expect(result.content[0].text).toContain('TMT');
+    });
+  });
+
+  // ─── loxo_upload_resume ─────────────────────────────────────────────────
+
+  describe('loxo_upload_resume', () => {
+    it('uploads resume to /people/{id}/resumes endpoint', async () => {
+      let capturedUrl = '';
+      let capturedBody: any = null;
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedBody = opts?.body;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            id: 12345, name: 'cv.pdf', person_id: 42, created_at: '2026-03-16T12:00:00Z'
+          })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_upload_resume', {
+        person_id: '42',
+        file_name: 'cv.pdf',
+        file_content_base64: Buffer.from('fake pdf content').toString('base64'),
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('/people/42/resumes');
+      // Body should be FormData (not URLSearchParams)
+      expect(capturedBody).toBeInstanceOf(FormData);
+      expect(result.content[0].text).toContain('cv.pdf');
+    });
+
+    it('returns error when person_id is missing', async () => {
+      const result = await callTool(client, 'loxo_upload_resume', {
+        file_name: 'cv.pdf',
+        file_content_base64: Buffer.from('content').toString('base64'),
+      });
+      expect(result.isError).toBe(true);
     });
   });
 });
