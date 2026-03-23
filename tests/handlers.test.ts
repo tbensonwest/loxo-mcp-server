@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { server } from '../src/server.js';
 
 // Helper: stub globalThis.fetch with a static JSON response
@@ -508,6 +508,46 @@ describe('Loxo MCP tool handlers', () => {
         file_content_base64: Buffer.from('content').toString('base64'),
       });
       expect(result.isError).toBe(true);
+    });
+  });
+
+  // ─── Tool description cross-references ──────────────────────────────────
+
+  describe('tool descriptions guide toward candidate brief', () => {
+    it('loxo_get_candidate mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_get_candidate');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
+    });
+
+    it('loxo_get_candidate_activities mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_get_candidate_activities');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
+    });
+
+    it('loxo_get_job_pipeline mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_get_job_pipeline');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
+    });
+
+    it('loxo_search_candidates mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_search_candidates');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
     });
   });
 });
