@@ -3,3 +3,5 @@ package-lock.json
 .api
 node_modules
 .worktrees
+docs/.vitepress/dist
+docs/.vitepress/cache

@@ -10,7 +10,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
-    "lint:fix": "eslint src --fix"
+    "lint:fix": "eslint src --fix",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
     "@api/loxo": "file:.api/apis/loxo",
@@ -26,6 +29,7 @@
     "eslint": "^10.0.2",
     "typescript": "latest",
     "typescript-eslint": "^8.56.1",
+    "vitepress": "^1.6.4",
     "vitest": "^4.0.18",
     "yaml": "^2.8.2"
   }
