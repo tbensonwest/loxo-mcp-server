@@ -8,7 +8,7 @@ The [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) is an open 
 
 The Loxo MCP Server connects Claude directly to your Loxo recruitment platform. Once installed, Claude can search your candidate database, pull up job pipelines, review activity history, log calls and meetings, and manage candidate records — all through natural conversation.
 
-The server provides 28 tools covering the full recruiter workflow. Tool descriptions are written to guide Claude toward the most useful data: recruiter intake notes, call summaries, compensation expectations, and recent touchpoints. When you ask Claude to prepare a briefing or evaluate a candidate, it knows where to look.
+The server provides 27 tools covering the full recruiter workflow. Tool descriptions are written to guide Claude toward the most useful data: recruiter intake notes, call summaries, compensation expectations, and recent touchpoints. When you ask Claude to prepare a briefing or evaluate a candidate, it knows where to look.
 
 ## What can you ask Claude to do?
 
@@ -25,7 +25,7 @@ Here are some examples of prompts that work well with the Loxo MCP Server:
 
 ## Tool categories
 
-The 28 tools are organised into five categories:
+The 27 tools are organised into five categories:
 
 - **[Candidates](/reference/candidates)** — Search, research, and retrieve full candidate profiles including intake notes, contact details, work history, and education.
 
