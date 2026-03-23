@@ -156,9 +156,9 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 ### Preparing a client briefing pack
 
-"Prepare a briefing pack for the CapEQ role."
+"Prepare a briefing pack for the Northvale role."
 
-1. `loxo_search_jobs` — find the CapEQ job and get its ID
+1. `loxo_search_jobs` — find the Northvale job and get its ID
 2. `loxo_get_job_pipeline` — get all candidates and their current stage
 3. `loxo_get_candidate_brief` (per candidate) — pull intake notes, contact details, and recent intel-rich activities in one call
 4. Compile into a structured briefing document with current stage, motivations, compensation expectations, and recent touchpoints

@@ -19,9 +19,9 @@ Create a new candidate record with name, contact info, and current role. The can
 
 ### Example
 
-> "Add a new candidate: James Park, VP of Operations at Meridian Capital, based in New York, email james.park@meridian.com"
+> "Add a new candidate: James Park, VP of Operations at Ridgepoint Partners, based in New York, email james.park@ridgepoint.com"
 
-Claude calls `loxo_create_candidate` with `name: "James Park"`, `email: "james.park@meridian.com"`, `current_title: "VP of Operations"`, `current_company: "Meridian Capital"`, and `location: "New York"`. The candidate is now in Loxo and can be added to job pipelines.
+Claude calls `loxo_create_candidate` with `name: "James Park"`, `email: "james.park@ridgepoint.com"`, `current_title: "VP of Operations"`, `current_company: "Ridgepoint Partners"`, and `location: "New York"`. The candidate is now in Loxo and can be added to job pipelines.
 
 ### Related tools
 

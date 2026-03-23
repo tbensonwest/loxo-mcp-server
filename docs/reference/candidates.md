@@ -23,9 +23,9 @@ Search for candidates using Lucene query syntax. Filter by current title, past e
 
 ### Example
 
-> "Find all candidates who worked at Goldman Sachs"
+> "Find all candidates who worked at Sterling & Associates"
 
-Claude calls `loxo_search_candidates` with `company: "Goldman Sachs"`, returning matching candidate profiles with names, current roles, and tags. You can then pick any candidate from the results and ask Claude to pull their full brief.
+Claude calls `loxo_search_candidates` with `company: "Sterling & Associates"`, returning matching candidate profiles with names, current roles, and tags. You can then pick any candidate from the results and ask Claude to pull their full brief.
 
 ### Related tools
 
@@ -169,9 +169,9 @@ Detailed information about a specific role in a candidate's work history, includ
 
 ### Example
 
-> "Tell me more about her time at Blackstone"
+> "Tell me more about her time at Summit Capital"
 
-After listing job profiles, Claude identifies the Blackstone entry and calls `loxo_get_person_job_profile_detail` with the person ID and that job profile's resource ID, returning the full description of her role, responsibilities, and tenure at Blackstone.
+After listing job profiles, Claude identifies the Summit Capital entry and calls `loxo_get_person_job_profile_detail` with the person ID and that job profile's resource ID, returning the full description of her role, responsibilities, and tenure at Summit Capital.
 
 ### Related tools
 

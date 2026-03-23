@@ -14,11 +14,11 @@ The server provides 27 tools covering the full recruiter workflow. Tool descript
 
 Here are some examples of prompts that work well with the Loxo MCP Server:
 
-- "Prepare a briefing pack for the CapEQ role."
+- "Prepare a briefing pack for the Northvale role."
 - "Give me a status update on all active candidates."
 - "Who from our database would suit this new CFO role?"
 - "What's the latest with Sarah — where did we leave things?"
-- "Add a new candidate: John Smith, CFO at Acme Corp."
+- "Add a new candidate: John Smith, CFO at Helios Labs."
 - "Log a call with the candidate — we discussed salary expectations and timeline."
 - "Show me all my tasks for today."
 - "Search for candidates with private equity experience in London."
