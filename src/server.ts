@@ -1636,7 +1636,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           || [];
 
         const filteredActivities = Array.isArray(allActivities)
-          ? allActivities.filter((a: any) => !NOISE_ACTIVITY_TYPE_IDS.has(a.activity_type_id))
+          ? allActivities.filter((a: { activity_type_id: number }) => !NOISE_ACTIVITY_TYPE_IDS.has(a.activity_type_id))
           : [];
 
         const brief = {
