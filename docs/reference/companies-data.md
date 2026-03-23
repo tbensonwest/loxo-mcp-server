@@ -43,9 +43,9 @@ Full company profile including description, contacts, relationships, and status.
 
 ### Example
 
-> "Tell me about CapEQ Partners -- what do we know about them?"
+> "Tell me about Northvale Partners -- what do we know about them?"
 
-Claude searches for CapEQ Partners, then calls `loxo_get_company_details` with the company ID, returning the full profile -- description, industry, location, key contacts, and any notes or relationships on file.
+Claude searches for Northvale Partners, then calls `loxo_get_company_details` with the company ID, returning the full profile -- description, industry, location, key contacts, and any notes or relationships on file.
 
 ### Related tools
 

@@ -4,7 +4,7 @@ You've sourced someone new and need to get them into Loxo with their full detail
 
 ## What to say to Claude
 
-> "Add a new candidate: Jane Park, VP Engineering at Acme Corp, jane.park@acme.com, based in Austin TX. Tag her as 'executive' and 'engineering-leader'."
+> "Add a new candidate: Jane Park, VP Engineering at Helios Labs, jane.park@helioslabs.com, based in Austin TX. Tag her as 'executive' and 'engineering-leader'."
 
 ## What happens
 
@@ -20,8 +20,8 @@ You've sourced someone new and need to get them into Loxo with their full detail
 > - **Candidate ID:** 928471
 > - **Name:** Jane Park
 > - **Title:** VP Engineering
-> - **Company:** Acme Corp
-> - **Email:** jane.park@acme.com
+> - **Company:** Helios Labs
+> - **Email:** jane.park@helioslabs.com
 > - **Location:** Austin, TX
 > - **Tags:** executive, engineering-leader
 > - **Person type:** Candidate

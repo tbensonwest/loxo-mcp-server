@@ -428,10 +428,10 @@ describe('Loxo MCP tool handlers', () => {
 
   describe('loxo_search_companies', () => {
     it('returns company list', async () => {
-      mockFetch({ companies: [{ id: 1, name: 'Acme Corp' }], total_count: 1, scroll_id: null });
-      const result = await callTool(client, 'loxo_search_companies', { query: 'Acme' });
+      mockFetch({ companies: [{ id: 1, name: 'Helios Labs' }], total_count: 1, scroll_id: null });
+      const result = await callTool(client, 'loxo_search_companies', { query: 'Helios' });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('Acme Corp');
+      expect(result.content[0].text).toContain('Helios Labs');
     });
   });
 });

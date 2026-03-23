@@ -41,7 +41,7 @@ Full job details including description, requirements, compensation, status, and 
 
 ### Example
 
-> "Show me the full details for the CapEQ VP Finance role"
+> "Show me the full details for the Northvale VP Finance role"
 
 Claude searches for the job, then calls `loxo_get_job` with its ID, returning the complete job spec -- description, requirements, compensation range, location, status, and the assigned recruiter. This gives Claude the context it needs to evaluate whether a candidate is a good fit.
 
@@ -68,7 +68,7 @@ All candidates currently on a job with their pipeline stage (e.g., Sourced, Scre
 
 ### Example
 
-> "Who's on the pipeline for the CapEQ role and what stage are they at?"
+> "Who's on the pipeline for the Northvale role and what stage are they at?"
 
 Claude looks up the job, then calls `loxo_get_job_pipeline` with the job ID. The response lists every candidate on the role along with their current pipeline stage, letting Claude summarize how many candidates are at each stage and who is furthest along.
 
@@ -94,9 +94,9 @@ Add a candidate to a job's pipeline. This is a write operation -- the candidate 
 
 ### Example
 
-> "Add Sarah Chen to the CapEQ VP Finance pipeline"
+> "Add Sarah Chen to the Northvale VP Finance pipeline"
 
-Claude looks up Sarah Chen and the CapEQ job, then calls `loxo_add_to_pipeline` with `job_id` and `person_id`, along with notes like "Strong PE fund accounting background from Blackstone. Client specifically asked about this experience." The candidate now appears on the job's pipeline in Loxo.
+Claude looks up Sarah Chen and the Northvale job, then calls `loxo_add_to_pipeline` with `job_id` and `person_id`, along with notes like "Strong PE fund accounting background from Summit Capital. Client specifically asked about this experience." The candidate now appears on the job's pipeline in Loxo.
 
 ### Related tools
 

@@ -44,9 +44,9 @@ Record a completed activity (call, email, meeting, interview) against a candidat
 
 ### Example
 
-> "Log a call with Marcus Rivera about the CapEQ role -- he's interested but wants to wait until Q3"
+> "Log a call with Marcus Rivera about the Northvale role -- he's interested but wants to wait until Q3"
 
-Claude looks up the activity type ID for "Call" using `loxo_get_activity_types`, then calls `loxo_log_activity` with Marcus's person ID, the CapEQ job ID, the call activity type ID, and notes capturing that he is interested but prefers a Q3 timeline. The activity now appears on his timeline in Loxo.
+Claude looks up the activity type ID for "Call" using `loxo_get_activity_types`, then calls `loxo_log_activity` with Marcus's person ID, the Northvale job ID, the call activity type ID, and notes capturing that he is interested but prefers a Q3 timeline. The activity now appears on his timeline in Loxo.
 
 ### Related tools
 
@@ -75,7 +75,7 @@ Create a future activity (call, meeting, interview) for a candidate. The activit
 
 > "Schedule a follow-up call with Sarah Chen for next Tuesday at 2pm"
 
-Claude looks up the activity type ID for "Call," then calls `loxo_schedule_activity` with Sarah's person ID, the call activity type ID, `created_at: "2026-03-31T14:00:00Z"`, and notes like "Follow up on interview feedback from CapEQ." The call now appears on the task list for that date.
+Claude looks up the activity type ID for "Call," then calls `loxo_schedule_activity` with Sarah's person ID, the call activity type ID, `created_at: "2026-03-31T14:00:00Z"`, and notes like "Follow up on interview feedback from Northvale." The call now appears on the task list for that date.
 
 ### Related tools
 
