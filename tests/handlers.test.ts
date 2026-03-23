@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolResultSchema, ListToolsResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import { server } from '../src/server.js';
 
 // Helper: stub globalThis.fetch with a static JSON response
@@ -119,9 +119,98 @@ describe('Loxo MCP tool handlers', () => {
 
       const result = await callTool(client, 'loxo_get_candidate_brief', { id: '42' });
       expect(result.isError).toBeFalsy();
-      expect(result.content[0].text).toContain('Jane Smith');
-      expect(result.content[0].text).toContain('jane@example.com');
-      expect(result.content[0].text).toContain('recent_activities');
+      const text = result.content[0].text as string;
+      expect(text).toContain('Jane Smith');
+      expect(text).toContain('jane@example.com');
+      expect(text).toContain('recent_activities');
+      expect(text).toContain('activity_pagination');
+    });
+  });
+
+  // ─── loxo_get_candidate_brief (filtered activities) ─────────────────────
+
+  describe('loxo_get_candidate_brief filtered activities', () => {
+    // Helper to create a mock fetch that returns specific activities
+    function mockBriefFetch(activities: unknown[], scrollId: string | null = null) {
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        let data: unknown;
+        if (url.includes('/emails')) {
+          data = [{ value: 'test@example.com' }];
+        } else if (url.includes('/phones')) {
+          data = [{ value: '+44 7700 900000' }];
+        } else if (url.includes('person_events')) {
+          data = { person_events: activities, scroll_id: scrollId, total_count: activities.length };
+        } else {
+          data = { id: '42', name: 'Test Candidate', description: 'Intake notes here' };
+        }
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify(data)),
+        });
+      }));
+    }
+
+    it('excludes noise activity types from results', async () => {
+      mockBriefFetch([
+        { id: 1, notes: 'Called re: role', activity_type_id: 1550062 },   // Outgoing Phone Call - intel
+        { id: 2, notes: '', activity_type_id: 1550055 },                  // Added to Job - noise
+        { id: 3, notes: 'Discussed salary', activity_type_id: 1550051 },  // Note Update - intel
+        { id: 4, notes: '', activity_type_id: 1550079 },                  // Hired - noise
+      ]);
+
+      const result = await callTool(client, 'loxo_get_candidate_brief', { id: '42' });
+      const parsed = JSON.parse(result.content[0].text as string);
+      expect(parsed.recent_activities).toHaveLength(2);
+      expect(parsed.recent_activities[0].id).toBe(1);
+      expect(parsed.recent_activities[1].id).toBe(3);
+    });
+
+    it('returns empty activities when all are noise', async () => {
+      mockBriefFetch([
+        { id: 1, notes: '', activity_type_id: 1550055 },  // Added to Job
+        { id: 2, notes: '', activity_type_id: 1550079 },  // Hired
+        { id: 3, notes: '', activity_type_id: 2925520 },  // CRM Agent
+      ]);
+
+      const result = await callTool(client, 'loxo_get_candidate_brief', { id: '42' });
+      const parsed = JSON.parse(result.content[0].text as string);
+      expect(parsed.recent_activities).toHaveLength(0);
+    });
+
+    it('includes activity_pagination in response', async () => {
+      mockBriefFetch(
+        [{ id: 1, notes: 'Called', activity_type_id: 1550062 }],
+        'abc123'
+      );
+
+      const result = await callTool(client, 'loxo_get_candidate_brief', { id: '42' });
+      const parsed = JSON.parse(result.content[0].text as string);
+      expect(parsed.activity_pagination).toBeDefined();
+      expect(parsed.activity_pagination.scroll_id).toBe('abc123');
+      expect(parsed.activity_pagination.has_more).toBe(true);
+    });
+
+    it('sets has_more false when no scroll_id from API', async () => {
+      mockBriefFetch(
+        [{ id: 1, notes: 'Called', activity_type_id: 1550062 }],
+        null
+      );
+
+      const result = await callTool(client, 'loxo_get_candidate_brief', { id: '42' });
+      const parsed = JSON.parse(result.content[0].text as string);
+      expect(parsed.activity_pagination.has_more).toBe(false);
+      expect(parsed.activity_pagination.scroll_id).toBeNull();
+    });
+
+    it('passes scroll_id to API for pagination', async () => {
+      mockBriefFetch([{ id: 10, notes: 'Older call', activity_type_id: 1550063 }]);
+
+      await callTool(client, 'loxo_get_candidate_brief', { id: '42', scroll_id: 'page2cursor' });
+
+      const fetchCalls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+      const eventsCall = fetchCalls.find(([url]: [string]) => url.includes('person_events'));
+      expect(eventsCall).toBeDefined();
+      expect(eventsCall![0]).toContain('scroll_id=page2cursor');
     });
   });
 
@@ -419,6 +508,46 @@ describe('Loxo MCP tool handlers', () => {
         file_content_base64: Buffer.from('content').toString('base64'),
       });
       expect(result.isError).toBe(true);
+    });
+  });
+
+  // ─── Tool description cross-references ──────────────────────────────────
+
+  describe('tool descriptions guide toward candidate brief', () => {
+    it('loxo_get_candidate mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_get_candidate');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
+    });
+
+    it('loxo_get_candidate_activities mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_get_candidate_activities');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
+    });
+
+    it('loxo_get_job_pipeline mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_get_job_pipeline');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
+    });
+
+    it('loxo_search_candidates mentions loxo_get_candidate_brief', async () => {
+      const result = await client.request(
+        { method: 'tools/list', params: {} },
+        ListToolsResultSchema
+      );
+      const tool = result.tools.find((t: any) => t.name === 'loxo_search_candidates');
+      expect(tool.description).toContain('loxo_get_candidate_brief');
     });
   });
 });

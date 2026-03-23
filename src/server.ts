@@ -447,6 +447,42 @@ type TypeGetCompanyDetailsArgs = z.infer<typeof GetCompanyDetailsSchema>;
 
 type EntityIdArg = z.infer<typeof EntityIdSchema>;
 
+// Activity types that represent pipeline state transitions or automation events.
+// Used by loxo_get_candidate_brief to filter out noise and return only intel-rich activities.
+const NOISE_ACTIVITY_TYPE_IDS = new Set([
+  1550048, // Marked as Maybe
+  1550049, // Marked as Yes
+  1550050, // Longlisted
+  1550052, // Sent Automated Email
+  1550054, // Applied
+  1550055, // Added to Job
+  1550056, // Unsourced
+  1550057, // Outbound
+  1550066, // Outreach™ Task Completed
+  1550067, // Outreach™ SMS Sent
+  1550068, // Outreach™ Email Sent
+  1550069, // Outreach™ Added to Call Queue
+  1550070, // Submitted
+  1550071, // Scheduling
+  1550072, // Consultant Interview
+  1550073, // 1st Client Interview
+  1550074, // 2nd Client Interview
+  1550075, // 3rd Client Interview
+  1550076, // Final Client Interview
+  1550077, // Hold
+  1550078, // Offer Extended
+  1550079, // Hired
+  1550080, // Rejected
+  1550081, // Rejected by Client
+  1550082, // Rejected by Candidate
+  1550083, // Rejected by Consultant
+  1550084, // Loxo AI Sourced
+  1550085, // Form Filled
+  2311492, // Linkedin Connection Request
+  2373096, // Pitched
+  2925520, // Updated by Self-updating CRM Agent
+]);
+
 // Create server instance
 const server = new Server(
   {
@@ -568,7 +604,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_search_candidates",
-        description: "Search for candidates using Lucene query syntax. Uses cursor-based pagination with scroll_id. Returns skillsets and tags in results for filtering without additional API calls.\n\nIMPORTANT - LOXO FIELD NAME MAPPING:\n- Query uses 'skills' (search index field): query='skills:\"Python\"'\n- Response returns 'skillsets' (API field): {skillsets: \"Python, JavaScript\"}\n- Query uses 'all_raw_tags', response returns 'all_raw_tags' (same)\n\nSIMPLE QUERY EXAMPLES:\n(1) Past employer: query='job_profiles.company_name:\"Google\"'\n(2) Skills: query='skills:\"Python\"'\n(3) Current role: company='Acme Corp' and title='Engineer'\n\nCOMPLEX MULTI-CRITERIA EXAMPLES:\n(4) Multiple titles with skills: query='(current_title:\"Director\" OR current_title:\"Senior Director\") AND skills:\"financial due diligence\"'\n(5) Multiple role types at specific level: query='(current_title:(\"Deal Advisory\" OR \"Transaction Services\" OR \"Transaction Advisory\")) AND current_title:\"Director\" AND skills:\"due diligence\"'\n(6) Past companies with skills: query='(job_profiles.company_name:(\"KPMG\" OR \"Deloitte\" OR \"PwC\" OR \"EY\")) AND skills:(\"M&A\" OR \"financial due diligence\")'\n(7) Combined current AND past: query='current_title:\"Director\" AND job_profiles.company_name:(\"Big 4\") AND skills:\"financial modeling\"'\n(8) Tags: query='all_raw_tags:\"key account\"'\n\nNULL/EMPTY FIELD SEARCHES (data quality checks):\n(9) Candidates WITHOUT skills: query='NOT _exists_:skills'\n(10) Candidates WITH skills: query='_exists_:skills'\n(11) Candidates WITHOUT tags: query='NOT _exists_:all_raw_tags'\n(12) Candidates missing location: query='NOT _exists_:location'\n(13) Candidates missing current company: query='NOT _exists_:current_company'\n\nTIPS: Use OR for multiple options, AND to combine criteria, parentheses for grouping, NOT _exists_:fieldname for null checks. ALWAYS use search index field names (skills not skillsets) in queries. Start with comprehensive queries to get all relevant candidates in fewer API calls.\n\nReturns: id, name, current_title, current_company, location, skillsets (from 'skills' field), all_raw_tags. Use scroll_id from pagination for next page.",
+        description: "Search for candidates using Lucene query syntax. Uses cursor-based pagination with scroll_id. Returns skillsets and tags in results for filtering without additional API calls.\n\nIMPORTANT - LOXO FIELD NAME MAPPING:\n- Query uses 'skills' (search index field): query='skills:\"Python\"'\n- Response returns 'skillsets' (API field): {skillsets: \"Python, JavaScript\"}\n- Query uses 'all_raw_tags', response returns 'all_raw_tags' (same)\n\nSIMPLE QUERY EXAMPLES:\n(1) Past employer: query='job_profiles.company_name:\"Google\"'\n(2) Skills: query='skills:\"Python\"'\n(3) Current role: company='Acme Corp' and title='Engineer'\n\nCOMPLEX MULTI-CRITERIA EXAMPLES:\n(4) Multiple titles with skills: query='(current_title:\"Director\" OR current_title:\"Senior Director\") AND skills:\"financial due diligence\"'\n(5) Multiple role types at specific level: query='(current_title:(\"Deal Advisory\" OR \"Transaction Services\" OR \"Transaction Advisory\")) AND current_title:\"Director\" AND skills:\"due diligence\"'\n(6) Past companies with skills: query='(job_profiles.company_name:(\"KPMG\" OR \"Deloitte\" OR \"PwC\" OR \"EY\")) AND skills:(\"M&A\" OR \"financial due diligence\")'\n(7) Combined current AND past: query='current_title:\"Director\" AND job_profiles.company_name:(\"Big 4\") AND skills:\"financial modeling\"'\n(8) Tags: query='all_raw_tags:\"key account\"'\n\nNULL/EMPTY FIELD SEARCHES (data quality checks):\n(9) Candidates WITHOUT skills: query='NOT _exists_:skills'\n(10) Candidates WITH skills: query='_exists_:skills'\n(11) Candidates WITHOUT tags: query='NOT _exists_:all_raw_tags'\n(12) Candidates missing location: query='NOT _exists_:location'\n(13) Candidates missing current company: query='NOT _exists_:current_company'\n\nTIPS: Use OR for multiple options, AND to combine criteria, parentheses for grouping, NOT _exists_:fieldname for null checks. ALWAYS use search index field names (skills not skillsets) in queries. Start with comprehensive queries to get all relevant candidates in fewer API calls.\n\nWhen evaluating candidate fit for a role or preparing recommendations, follow up with loxo_get_candidate_brief for shortlisted candidates to get recruiter intake notes and recent activity context.\n\nReturns: id, name, current_title, current_company, location, skillsets (from 'skills' field), all_raw_tags. Use scroll_id from pagination for next page.",
         inputSchema: {
           type: "object",
           properties: {
@@ -624,7 +660,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_candidate",
-        description: "Get complete candidate profile including bio, location, current role, skills, tags, compensation, and embedded lists of jobs/education/emails/phones. Use this for overview. For guaranteed complete contact info or work history, use dedicated tools: loxo_get_person_emails, loxo_get_person_phones, loxo_list_person_job_profiles, loxo_list_person_education_profiles. Example: After searching candidates, use their ID here to get full details.",
+        description: "Get complete candidate profile including bio, location, current role, skills, tags, compensation, and embedded lists of jobs/education/emails/phones. The 'description' field contains the recruiter's call and intake notes — personal circumstances, motivations, compensation expectations, and role preferences. This is often the richest source of candidate intelligence. For a complete picture combining intake notes with recent activity (including Ringover call summaries), use loxo_get_candidate_brief instead. Example: After searching candidates, use their ID here to get full details.",
         inputSchema: {
           type: "object",
           properties: {
@@ -985,7 +1021,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_candidate_activities",
-        description: "Get the activity history for a candidate — all calls, emails, meetings, and notes logged against them. Use before drafting outreach to see recent contact history and avoid re-pitching someone just spoken to. Returns most recent activities first. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
+        description: "Get the full unfiltered activity history for a candidate — all calls, emails, meetings, notes, pipeline moves, and automation events. Returns most recent activities first. For a filtered view with only intel-rich activities (excluding pipeline noise), use loxo_get_candidate_brief instead. For the recruiter's own call/intake notes (motivations, personal circumstances, compensation), check the 'description' field via loxo_get_candidate or loxo_get_candidate_brief. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -1000,12 +1036,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_candidate_brief",
-        description: "Get a complete candidate brief in one call: full profile, all contact details, and 5 most recent activities. Use this as the first step before drafting any outreach — it gives you everything you need to write a personalised message without making multiple API calls. Returns: profile fields, email list, phone list, recent_activities (last 5).",
+        description: "Get a complete candidate brief in one call: full profile (including recruiter intake/call notes in the 'description' field), all contact details, and recent intel-rich activities (calls, emails, notes, interviews — filtered to exclude pipeline moves and automation noise). Use this as the first step whenever you need full candidate context — before drafting outreach, preparing client briefing packs, pipeline status updates, or evaluating candidate-role fit. The combination of intake notes and activity history gives the most complete picture of a candidate. Supports pagination via scroll_id for retrieving older activity when you need to dig deeper (e.g. finding salary expectations from an earlier conversation). Returns: profile fields, email list, phone list, recent_activities (intel-rich only), activity_pagination.",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string", description: "The candidate's person ID (required)." },
+            scroll_id: { type: "string", description: "Pagination cursor for older intel-rich activities." },
             response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
           },
           required: ["id"],
@@ -1013,7 +1050,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_job_pipeline",
-        description: "Get all candidates in the pipeline for a specific job, with their current stage. Use for pipeline reviews — see who's at which stage, identify stalled candidates, and plan next actions. Example: 'Show me the pipeline for job 456' returns all candidates and their stage (sourced, screened, interviewing, offer, placed).",
+        description: "Get all candidates in the pipeline for a specific job, with their current stage. Returns candidate IDs and pipeline stages only. For client briefing packs or status updates, follow up with loxo_get_candidate_brief for each candidate to get their intake notes, personal context, and recent activity (including Ringover call summaries). Example: 'Show me the pipeline for job 456' returns all candidates and their stage (sourced, screened, interviewing, offer, placed).",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -1568,15 +1605,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_get_candidate_brief": {
-        const { id, response_format = 'json' } = args as any;
+        const { id, scroll_id, response_format = 'json' } = args as any;
 
         requireNumericId(id, 'id');
+
+        const activityParams = new URLSearchParams();
+        activityParams.append('person_id', id.toString());
+        activityParams.append('per_page', '50');
+        if (scroll_id) activityParams.append('scroll_id', scroll_id);
 
         const [profileResult, emailsResult, phonesResult, activitiesResult] = await Promise.allSettled([
           makeRequest<Candidate>(`/${env.LOXO_AGENCY_SLUG}/people/${id}`),
           makeRequest<EmailInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${id}/emails`),
           makeRequest<PhoneInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${id}/phones`),
-          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/person_events?person_id=${id}&per_page=5`),
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/person_events?${activityParams.toString()}`),
         ]);
 
         if (profileResult.status === 'rejected') {
@@ -1588,18 +1630,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const phones = phonesResult.status === 'fulfilled' ? phonesResult.value : [];
         const activitiesResponse = activitiesResult.status === 'fulfilled' ? activitiesResult.value : null;
 
-        const recentActivities = activitiesResponse?.person_events
+        const allActivities = activitiesResponse?.person_events
           || activitiesResponse?.events
           || activitiesResponse
           || [];
+
+        const filteredActivities = Array.isArray(allActivities)
+          ? allActivities.filter((a: { activity_type_id: number }) => !NOISE_ACTIVITY_TYPE_IDS.has(a.activity_type_id))
+          : [];
 
         const brief = {
           profile,
           emails,
           phones,
-          recent_activities: Array.isArray(recentActivities)
-            ? recentActivities.slice(0, 5)
-            : [],
+          recent_activities: filteredActivities,
+          activity_pagination: {
+            scroll_id: activitiesResponse?.scroll_id || null,
+            has_more: !!(activitiesResponse?.scroll_id),
+          },
         };
 
         const formatted = formatResponse(brief, response_format as 'json' | 'markdown');
