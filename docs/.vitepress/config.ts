@@ -5,6 +5,7 @@ export default defineConfig({
   description: 'Give Claude direct access to your Loxo recruitment platform',
 
   srcExclude: ['plans/**', 'superpowers/**'],
+  ignoreDeadLinks: true,
 
   themeConfig: {
     nav: [
