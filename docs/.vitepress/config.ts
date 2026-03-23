@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: 'Loxo MCP Server',
   description: 'Give Claude direct access to your Loxo recruitment platform',
+  base: '/loxo-mcp-server/',
 
   srcExclude: ['plans/**', 'superpowers/**'],
 
