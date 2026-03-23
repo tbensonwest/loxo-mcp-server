@@ -3,7 +3,7 @@
 
 # Loxo MCP Server
 
-A Model Context Protocol (MCP) server that provides tools for interacting with the Loxo recruitment platform API (v1.3.1). This server enables AI assistants to perform various recruitment-related tasks such as managing candidates, jobs, companies, and activities.
+A Model Context Protocol (MCP) server that gives Claude direct access to the Loxo recruitment platform. Version 1.5.0 provides 28 tools covering the full recruiter workflow: searching and researching candidates, managing job pipelines, tracking activity and communication, working with companies, and maintaining candidate records. Tool descriptions guide Claude to surface recruiter intake notes and intel-rich activity history — so it can answer "where did we leave things with this candidate?" without you having to dig.
 
 <a href="https://glama.ai/mcp/servers/rj00ooup46"><img width="380" height="200" src="https://glama.ai/mcp/servers/rj00ooup46/badge" alt="Loxo Server MCP server" /></a>
 
@@ -152,237 +152,105 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 }
 ```
 
-## Usage Examples
+## Workflow Examples
 
-Once configured, you can interact with the Loxo MCP server through natural language conversations with Claude. Here are some example interactions:
+### Preparing a client briefing pack
 
-### Finding Candidates
+"Prepare a briefing pack for the CapEQ role."
 
-**You:** "Find me candidates who have worked at Google and know TypeScript"
-
-**Claude will:**
-1. Use `search-candidates` with query: `job_profiles.company_name:"Google" AND skills:"TypeScript"`
-2. Return a list of matching candidates with their current roles, locations, **skills, and tags visible in search results** (no need to fetch full profiles for basic filtering)
-
----
-
-**You:** "Give me all candidates in deal advisory, transaction services, or transaction advisory with financial due diligence skills at director level"
-
-**Claude will:**
-1. Use `search-candidates` with complex query: `(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) AND current_title:"Director" AND skills:"financial due diligence"`
-2. Return comprehensive results (100 per page by default) with skills visible
-3. Filter and present matching candidates in a single response
+1. `loxo_search_jobs` — find the CapEQ job and get its ID
+2. `loxo_get_job_pipeline` — get all candidates and their current stage
+3. `loxo_get_candidate_brief` (per candidate) — pull intake notes, contact details, and recent intel-rich activities in one call
+4. Compile into a structured briefing document with current stage, motivations, compensation expectations, and recent touchpoints
 
 ---
 
-**You:** "Show me more details about candidate ID 12345"
+### Pipeline status update
 
-**Claude will:**
-1. Use `get-candidate` to retrieve full profile
-2. Display comprehensive information including job history, education, contact details, and skills
+"Give me a status update on all active candidates."
 
----
-
-**You:** "Get the complete work history for candidate 12345"
-
-**Claude will:**
-1. Use `list-person-job-profiles` to get all job entries
-2. Optionally use `get-person-job-profile-detail` for each entry to show full details
+1. `loxo_get_job_pipeline` — retrieve all candidates on the role with their stage
+2. `loxo_get_candidate_brief` (per candidate) — get intake notes and recent activity to summarise where each conversation stands
+3. Deliver a concise status summary: stage, last contact, next step
 
 ---
 
-### Advanced Search Techniques
+### Matching candidates to a new role
 
-The `search-candidates` tool supports complex Lucene queries for precise candidate filtering.
+"Who from our database would suit this new CFO role?"
 
-**IMPORTANT - Field Name Mapping:**
-- Queries use `skills` (search index): `query='skills:"Python"'`
-- Responses return `skillsets` (API field): `{skillsets: "Python, JavaScript"}`
-
-**Multiple Role Types with Skills:**
-```
-query='(current_title:("Deal Advisory" OR "Transaction Services" OR "Transaction Advisory")) 
-       AND current_title:"Director" 
-       AND skills:"financial due diligence"'
-```
-
-**Past Companies with Multiple Skills:**
-```
-query='(job_profiles.company_name:("KPMG" OR "Deloitte" OR "PwC" OR "EY")) 
-       AND skills:("M&A" OR "financial due diligence")'
-```
-
-**Combined Current and Past Experience:**
-```
-query='current_title:"Director" 
-       AND job_profiles.company_name:("Big 4") 
-       AND skills:"financial modeling"'
-```
-
-**Using Tags:**
-```
-query='all_raw_tags:"key account" AND current_title:"VP"'
-```
-
-**Data Quality - Finding Missing Fields:**
-```
-# Candidates without skills
-query='NOT _exists_:skills'
-
-# Candidates without tags  
-query='NOT _exists_:all_raw_tags'
-
-# Candidates missing location
-query='NOT _exists_:location'
-```
-
-**Benefits:**
-- Returns **100 results per page** (vs 20 previously) for fewer API calls
-- **Skillsets and tags visible in search results** - no need to fetch full profiles for filtering
-- Construct comprehensive queries upfront to get all relevant candidates in 1-2 API calls instead of 10+
-- Use `NOT _exists_:` to find incomplete profiles for data cleanup
-
----
-
-### Managing Activities
-
-**You:** "What are my tasks for today?"
-
-**Claude will:**
-1. Use `get-todays-tasks` with today's date range
-2. Show all scheduled activities and tasks
-
----
-
-**You:** "Schedule a follow-up call with candidate 12345 for next Tuesday at 2pm"
-
-**Claude will:**
-1. Use `get-activity-types` to find the call activity type ID
-2. Use `schedule-activity` with the candidate ID, activity type, and the specified date/time
-3. Confirm the activity was scheduled
-
----
-
-**You:** "Log that I just had a phone screen with candidate 12345. They were great, very strong React skills."
-
-**Claude will:**
-1. Use `get-activity-types` to find phone screen activity type ID
-2. Use `log-activity` with the candidate ID, activity type, and your notes
-3. Confirm the activity was logged
-
----
-
-### Searching Jobs
-
-**You:** "Find all remote Senior Engineer positions"
-
-**Claude will:**
-1. Use `search-jobs` with query containing title and location filters
-2. Display matching jobs with key details
-
----
-
-**You:** "Show me details for job 54321"
-
-**Claude will:**
-1. Use `get-job` to retrieve full job posting
-2. Display complete job information including description, requirements, and status
-
----
-
-### Working with Companies
-
-**You:** "Find all companies with 'Tech' in their name"
-
-**Claude will:**
-1. Use `search-companies` with query: `name:"Tech*"`
-2. Return list of matching companies
-
----
-
-**You:** "Get details for company 98765"
-
-**Claude will:**
-1. Use `get-company-details` to retrieve company information
-2. Display company profile including contacts and relationships
-
----
-
-### Getting Contact Information
-
-**You:** "What email addresses do we have for candidate 12345?"
-
-**Claude will:**
-1. Use `get-person-emails` to retrieve all email addresses
-2. Display the email addresses with their types
-
----
-
-**You:** "Get phone numbers for candidate 12345"
-
-**Claude will:**
-1. Use `get-person-phones` to retrieve all phone numbers
-2. Display phone numbers with their types
-
----
-
-### Reference Data
-
-**You:** "What activity types are available in Loxo?"
-
-**Claude will:**
-1. Use `get-activity-types` to retrieve the list
-2. Display all available activity types with their IDs
-
----
-
-**You:** "Who are the users in our agency?"
-
-**Claude will:**
-1. Use `list-users` to get agency users
-2. Display user list with names and emails
-
----
+1. `loxo_search_candidates` — search by title, skills, sector, and tags using Lucene queries
+2. `loxo_get_candidate_brief` (for shortlisted candidates) — review intake notes and activity history to assess genuine fit and current availability
+3. Surface the best matches with supporting evidence from recruiter notes and recent conversations
 
 ## Available Tools
 
-The server provides the following tools for AI assistants:
+### Find & Research Candidates
 
-### New in v2
+- **`loxo_search_candidates`** — Search the candidate database using Lucene queries. Filter by current title, past employers, skills, tags, location, or any combination. Returns 100 results per page including skillsets and tags, so you can filter without extra calls. Follow up with `loxo_get_candidate_brief` for shortlisted candidates.
+- **`loxo_get_candidate`** — Full candidate profile including bio, current role, skills, tags, compensation, and the recruiter's intake and call notes (in the `description` field). The `description` field is often the richest source of candidate intelligence: motivations, personal circumstances, compensation expectations, and role preferences.
+- **`loxo_get_candidate_brief`** — The go-to tool when you need full candidate context. Returns profile (including intake notes), all contact details, and recent intel-rich activities (calls, emails, notes, interviews — with pipeline noise filtered out) in a single call. Use this before drafting outreach, preparing briefing packs, or evaluating candidate-role fit. Supports pagination via `scroll_id` to dig back into older activity.
+- **`loxo_get_person_emails`** — All email addresses on file for a candidate, with type labels (work, personal, etc.).
+- **`loxo_get_person_phones`** — All phone numbers on file for a candidate, with type labels (mobile, work, home, etc.).
+- **`loxo_list_person_job_profiles`** — Complete work history list for a candidate: all roles, companies, and dates.
+- **`loxo_get_person_job_profile_detail`** — Detailed information about a specific role in a candidate's work history. Use after `loxo_list_person_job_profiles` when you need the full description for a particular position.
+- **`loxo_list_person_education_profiles`** — Complete education history for a candidate: all degrees, schools, and dates.
+- **`loxo_get_person_education_profile_detail`** — Detailed information about a specific education entry. Use after `loxo_list_person_education_profiles` when you need the full details for a particular qualification.
 
-- `loxo_create_candidate` — Create a new candidate from a CV or other source
-- `loxo_update_candidate` — Update an existing candidate's details
-- `loxo_get_candidate_brief` — Get full profile + contacts + recent activities in one call (use before drafting outreach)
-- `loxo_get_candidate_activities` — Get full activity history for a candidate
-- `loxo_get_job_pipeline` — See all candidates on a job and their pipeline stage
-- `loxo_apply_to_job` — Add a candidate to a job's pipeline
+### Manage Pipeline & Jobs
 
-### Activity & Event Management
-- `get-activity-types` - List available activity types
-- `get-todays-tasks` - Get scheduled items (supports date filtering)
-- `schedule-activity` - Create future person events
-- `log-activity` - Log completed person events
+- **`loxo_search_jobs`** — Search open roles using Lucene queries (title, location, or any combination). Uses page-based pagination.
+- **`loxo_get_job`** — Full job details including description, requirements, compensation, status, and hiring team.
+- **`loxo_get_job_pipeline`** — All candidates currently on a job with their pipeline stage (sourced, screened, interviewing, offer, placed). Returns candidate IDs and stages; follow up with `loxo_get_candidate_brief` for full context on each person.
+- **`loxo_add_to_pipeline`** — Add a candidate to a job's pipeline. Places them at the first stage and makes them visible in `loxo_get_job_pipeline`.
 
-### Candidate/People Management
-- `search-candidates` - Search using Lucene syntax with complex multi-criteria queries (scroll_id pagination, returns skillsets and tags in results, 100 results per page default)
-- `get-candidate` - Get full candidate profile
-- `get-person-emails` - Get all email addresses
-- `get-person-phones` - Get all phone numbers
-- `list-person-job-profiles` - List work history
-- `get-person-job-profile-detail` - Get specific job details
-- `list-person-education-profiles` - List education history
-- `get-person-education-profile-detail` - Get specific education details
+### Track Activity & Communication
 
-### Job Management
-- `search-jobs` - Search jobs (page-based pagination)
-- `get-job` - Get full job details
+- **`loxo_get_candidate_activities`** — Full unfiltered activity timeline for a candidate: all calls, emails, meetings, notes, pipeline moves, and automation events, most recent first. Use when you need the complete raw history. For a cleaner, intel-focused view, use `loxo_get_candidate_brief` instead.
+- **`loxo_log_activity`** — Record a completed activity (call, email, meeting, interview) against a candidate. Use `loxo_get_activity_types` first to find the correct activity type ID.
+- **`loxo_schedule_activity`** — Create a future activity (call, meeting, interview) for a candidate. Use `loxo_get_activity_types` first to find the correct activity type ID.
+- **`loxo_get_todays_tasks`** — All scheduled items for today (or a date range you specify). Optionally filter by user.
+- **`loxo_get_activity_types`** — List all activity types and their IDs. Call this before logging or scheduling activities to get the correct `activity_type_id`.
 
-### Company Management
-- `search-companies` - Search companies (scroll_id pagination)
-- `get-company-details` - Get company profile
+### Companies & Reference Data
 
-### User Management
-- `list-users` - List agency users
+- **`loxo_search_companies`** — Search the company database using Lucene queries. Uses cursor-based pagination with `scroll_id`.
+- **`loxo_get_company_details`** — Full company profile including description, contacts, relationships, and status.
+- **`loxo_list_users`** — All users in your Loxo agency (recruiters, coordinators, etc.) with names and emails. Use to find `user_id` values for filtering tasks or checking record ownership.
+- **`loxo_list_skillsets`** — All Skillset and Sector Experience options with their IDs. Use to find valid `skillset_ids` and `sector_ids` values before calling `loxo_update_candidate`.
+- **`loxo_list_source_types`** — All candidate source types (LinkedIn, API, Referral, etc.) with their IDs. Use to find valid `source_type_id` values.
+- **`loxo_list_person_types`** — All person type categories (Active Candidate, Prospect Candidate, etc.) with their IDs. Use to find valid `person_type_id` values.
+
+### Candidate Management
+
+- **`loxo_create_candidate`** — Create a new candidate record with name, contact info, and current role. After creating, use `loxo_update_candidate` to set tags, skillsets, person type, and source type.
+- **`loxo_update_candidate`** — Update an existing candidate's details: profile fields, tags, skillsets, sector, person type, and source type. Use `loxo_list_skillsets` and `loxo_list_person_types` to look up valid IDs first.
+- **`loxo_upload_resume`** — Upload a CV or resume file to a candidate's profile. Accepts base64-encoded file content. The file appears in the Resumes section of their Loxo record.
+
+## Architecture
+
+Built on the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/sdk), communicating over stdio for seamless integration with Claude Desktop and Claude.ai.
+
+- **v1.5.0** — 28 tools; tool descriptions guide Claude to surface recruiter intake notes (`description` field) and intel-rich activities (calls, emails, notes, interviews) while filtering out pipeline automation noise
+- All API calls go to `https://{LOXO_DOMAIN}/api/{LOXO_AGENCY_SLUG}/...` with Bearer token auth
+- POST/PATCH request bodies use `application/x-www-form-urlencoded` with bracket notation (e.g. `person[name]`)
+- All endpoints verified against the official Loxo OpenAPI specification
+
+### Pagination
+
+Two pagination styles are used depending on the endpoint:
+
+- **Cursor-based (`scroll_id`)** — used by candidates, companies, schedule items, and activities. Pass the `scroll_id` from one response to the next to walk through pages.
+- **Page-based (`page` / `per_page`)** — used by jobs. Pass `page=1`, `page=2`, etc.
+
+### Activity & Event System
+
+All activity tracking (calls, emails, meetings, notes, pipeline moves) goes through the `person_events` API:
+
+- **Scheduled activities** — use `loxo_schedule_activity` with a future `created_at` datetime
+- **Completed activities** — use `loxo_log_activity`; the current timestamp is applied automatically
+- Activities can be linked to a person, a job, and/or a company
+- `loxo_get_candidate_brief` filters activities to intel-rich types only (excludes pipeline automation events and other low-signal entries)
 
 ## Development
 
@@ -417,49 +285,3 @@ docker-compose logs -f
 # Stop the container
 docker-compose down
 ```
-
-## Type Safety
-
-The server uses Zod for runtime type validation of:
-- Environment variables
-- Tool input parameters
-- API responses
-
-## Error Handling
-
-The server includes comprehensive error handling for:
-- Environment validation
-- API request failures
-- Invalid tool parameters
-- Unknown tool requests
-
-## Architecture
-
-- Built using the Model Context Protocol SDK
-- Communicates over stdio for seamless integration with AI assistants
-- Uses TypeScript for type safety and better developer experience
-- Implements RESTful API calls to Loxo's platform (API v1.3.1)
-- All endpoints verified against official Loxo OpenAPI specification
-
-## Implementation Notes
-
-### Recent Changes
-- **Removed non-existent endpoints:** Tools for `spark-search-activity-types`, `get-call-queue`, `add-to-call-queue`, and `add-note` have been removed as these endpoints don't exist in the Loxo API
-- **Fixed activity endpoints:** `schedule-activity` and `log-activity` now correctly use the `/person_events` endpoint
-- **Fixed tasks endpoint:** `get-todays-tasks` now uses `/schedule_items` endpoint
-- **Fixed jobs search:** Now uses correct `/jobs` endpoint with page-based pagination (not scroll_id)
-
-### Pagination
-- **People/Companies/Events:** Use `scroll_id` cursor-based pagination
-- **Jobs:** Use `page` and `per_page` offset-based pagination
-
-### Activity/Event System
-Activities in Loxo are managed through the `person_events` API:
-- Scheduled activities use `created_at` with a future timestamp
-- Logged activities use current timestamp (no `created_at` parameter)
-- Events can be associated with a person, job, and/or company
-
-### API Request Format
-Most POST/PUT requests use `application/x-www-form-urlencoded` with field names in bracket notation:
-- Example: `person_event[activity_type_id]=3`
-- Example: `person_event[notes]=Great candidate`
