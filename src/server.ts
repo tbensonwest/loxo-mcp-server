@@ -1036,12 +1036,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_candidate_brief",
-        description: "Get a complete candidate brief in one call: full profile, all contact details, and 5 most recent activities. Use this as the first step before drafting any outreach — it gives you everything you need to write a personalised message without making multiple API calls. Returns: profile fields, email list, phone list, recent_activities (last 5).",
+        description: "Get a complete candidate brief in one call: full profile (including recruiter intake/call notes in the 'description' field), all contact details, and recent intel-rich activities (calls, emails, notes, interviews — filtered to exclude pipeline moves and automation noise). Use this as the first step whenever you need full candidate context — before drafting outreach, preparing client briefing packs, pipeline status updates, or evaluating candidate-role fit. The combination of intake notes and activity history gives the most complete picture of a candidate. Supports pagination via scroll_id for retrieving older activity when you need to dig deeper (e.g. finding salary expectations from an earlier conversation). Returns: profile fields, email list, phone list, recent_activities (intel-rich only), activity_pagination.",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
             id: { type: "string", description: "The candidate's person ID (required)." },
+            scroll_id: { type: "string", description: "Pagination cursor for older intel-rich activities." },
             response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
           },
           required: ["id"],
@@ -1604,15 +1605,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_get_candidate_brief": {
-        const { id, response_format = 'json' } = args as any;
+        const { id, scroll_id, response_format = 'json' } = args as any;
 
         requireNumericId(id, 'id');
+
+        const activityParams = new URLSearchParams();
+        activityParams.append('person_id', id.toString());
+        activityParams.append('per_page', '50');
+        if (scroll_id) activityParams.append('scroll_id', scroll_id);
 
         const [profileResult, emailsResult, phonesResult, activitiesResult] = await Promise.allSettled([
           makeRequest<Candidate>(`/${env.LOXO_AGENCY_SLUG}/people/${id}`),
           makeRequest<EmailInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${id}/emails`),
           makeRequest<PhoneInfo[]>(`/${env.LOXO_AGENCY_SLUG}/people/${id}/phones`),
-          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/person_events?person_id=${id}&per_page=5`),
+          makeRequest<any>(`/${env.LOXO_AGENCY_SLUG}/person_events?${activityParams.toString()}`),
         ]);
 
         if (profileResult.status === 'rejected') {
@@ -1624,18 +1630,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const phones = phonesResult.status === 'fulfilled' ? phonesResult.value : [];
         const activitiesResponse = activitiesResult.status === 'fulfilled' ? activitiesResult.value : null;
 
-        const recentActivities = activitiesResponse?.person_events
+        const allActivities = activitiesResponse?.person_events
           || activitiesResponse?.events
           || activitiesResponse
           || [];
+
+        const filteredActivities = Array.isArray(allActivities)
+          ? allActivities.filter((a: any) => !NOISE_ACTIVITY_TYPE_IDS.has(a.activity_type_id))
+          : [];
 
         const brief = {
           profile,
           emails,
           phones,
-          recent_activities: Array.isArray(recentActivities)
-            ? recentActivities.slice(0, 5)
-            : [],
+          recent_activities: filteredActivities,
+          activity_pagination: {
+            scroll_id: activitiesResponse?.scroll_id || null,
+            has_more: !!(activitiesResponse?.scroll_id),
+          },
         };
 
         const formatted = formatResponse(brief, response_format as 'json' | 'markdown');
