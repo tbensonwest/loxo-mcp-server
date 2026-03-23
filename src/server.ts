@@ -447,6 +447,42 @@ type TypeGetCompanyDetailsArgs = z.infer<typeof GetCompanyDetailsSchema>;
 
 type EntityIdArg = z.infer<typeof EntityIdSchema>;
 
+// Activity types that represent pipeline state transitions or automation events.
+// Used by loxo_get_candidate_brief to filter out noise and return only intel-rich activities.
+const NOISE_ACTIVITY_TYPE_IDS = new Set([
+  1550048, // Marked as Maybe
+  1550049, // Marked as Yes
+  1550050, // Longlisted
+  1550052, // Sent Automated Email
+  1550054, // Applied
+  1550055, // Added to Job
+  1550056, // Unsourced
+  1550057, // Outbound
+  1550066, // Outreach™ Task Completed
+  1550067, // Outreach™ SMS Sent
+  1550068, // Outreach™ Email Sent
+  1550069, // Outreach™ Added to Call Queue
+  1550070, // Submitted
+  1550071, // Scheduling
+  1550072, // Consultant Interview
+  1550073, // 1st Client Interview
+  1550074, // 2nd Client Interview
+  1550075, // 3rd Client Interview
+  1550076, // Final Client Interview
+  1550077, // Hold
+  1550078, // Offer Extended
+  1550079, // Hired
+  1550080, // Rejected
+  1550081, // Rejected by Client
+  1550082, // Rejected by Candidate
+  1550083, // Rejected by Consultant
+  1550084, // Loxo AI Sourced
+  1550085, // Form Filled
+  2311492, // Linkedin Connection Request
+  2373096, // Pitched
+  2925520, // Updated by Self-updating CRM Agent
+]);
+
 // Create server instance
 const server = new Server(
   {
