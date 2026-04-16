@@ -65,6 +65,15 @@ LOXO_AGENCY_SLUG=your_agency_slug
 | `LOXO_API_KEY` | Yes | — | Your Loxo API key |
 | `LOXO_AGENCY_SLUG` | Yes | — | Your agency's slug in Loxo |
 | `LOXO_DOMAIN` | No | `app.loxo.co` | Loxo API domain |
+| `LOXO_DEFAULT_OWNER_ID` | No | — | Default Loxo user ID to assign as record owner on candidates created or updated via this server. Overridden per-call by the `owned_by_id` arg. |
+
+### `LOXO_DEFAULT_OWNER_ID` (optional)
+
+A numeric Loxo user ID (stored as a string). When set, every candidate created or updated via `loxo_create_candidate` or `loxo_update_candidate` is assigned this user as `owned_by_id` — unless the call explicitly passes its own `owned_by_id` override.
+
+**How to find your user ID:** ask Claude to run `loxo_get_users` and look up your name in the results.
+
+**If not set:** candidates are created without an owner, which is the existing behaviour.
 
 ## Claude Desktop configuration
 

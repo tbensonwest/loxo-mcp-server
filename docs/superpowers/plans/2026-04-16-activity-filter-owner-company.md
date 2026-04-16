@@ -909,7 +909,7 @@ If any task's tests broke another task's tests, fix before moving on.
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 7.1: Add the docs-site link near the top**
+- [x] **Step 7.1: Add the docs-site link near the top**
 
 Open `README.md`. Locate the project title / tagline at the top. Immediately after it, add a documentation line (adapt wording to match existing tone):
 
@@ -917,7 +917,7 @@ Open `README.md`. Locate the project title / tagline at the top. Immediately aft
 **📚 Documentation:** https://tbensonwest.github.io/loxo-mcp-server/
 ```
 
-- [ ] **Step 7.2: Add `LOXO_DEFAULT_OWNER_ID` to the env var table**
+- [x] **Step 7.2: Add `LOXO_DEFAULT_OWNER_ID` to the env var table**
 
 Locate the environment-variables section (search for `LOXO_API_KEY`). Add a new row to the table (or list) mirroring the existing format:
 
@@ -925,7 +925,7 @@ Locate the environment-variables section (search for `LOXO_API_KEY`). Add a new 
 | `LOXO_DEFAULT_OWNER_ID` | No | Default Loxo user ID to set as `owned_by_id` on candidates created or updated via this server. Find your ID via `loxo_get_users`. |
 ```
 
-- [ ] **Step 7.3: Add `loxo_create_company` to the tool list**
+- [x] **Step 7.3: Add `loxo_create_company` to the tool list**
 
 Locate the tools list / capabilities section. Add `loxo_create_company` with a one-line description, e.g.:
 
@@ -933,7 +933,7 @@ Locate the tools list / capabilities section. Add `loxo_create_company` with a o
 - `loxo_create_company` — Create a new company (client/target account). Currently accepts only `name`.
 ```
 
-- [ ] **Step 7.4: Mention the activity_type_ids filter**
+- [x] **Step 7.4: Mention the activity_type_ids filter**
 
 If `loxo_get_candidate_activities` is listed in the README, update its blurb to mention the new optional filter:
 
@@ -941,7 +941,7 @@ If `loxo_get_candidate_activities` is listed in the README, update its blurb to 
 - `loxo_get_candidate_activities` — Full activity history for a candidate. Optionally filter by `activity_type_ids` (use `loxo_get_activity_types` to discover IDs).
 ```
 
-- [ ] **Step 7.5: Commit**
+- [x] **Step 7.5: Commit**
 
 ```bash
 git add README.md
@@ -965,7 +965,7 @@ activity_type_ids filter mention."
 - Modify: `docs/reference/activities-tasks.md`
 - Modify: `docs/guides/adding-candidate.md`
 
-- [ ] **Step 8.1: `docs/getting-started/installation.md` — document `LOXO_DEFAULT_OWNER_ID`**
+- [x] **Step 8.1: `docs/getting-started/installation.md` — document `LOXO_DEFAULT_OWNER_ID`**
 
 Find the env-var / configuration section. Add a subsection or table row:
 
@@ -979,7 +979,7 @@ A Loxo user ID (integer, as a string). When set, every candidate created or upda
 **If not set:** candidates are created without an owner (existing behaviour).
 ```
 
-- [ ] **Step 8.2: `docs/reference/candidates.md` — document `owned_by_id`**
+- [x] **Step 8.2: `docs/reference/candidates.md` — document `owned_by_id`**
 
 In the sections for `loxo_create_candidate` and `loxo_update_candidate`, add a new input row / paragraph:
 
@@ -993,7 +993,7 @@ Add a short "Ownership precedence" note:
 > **Ownership precedence:** explicit `owned_by_id` arg wins over the `LOXO_DEFAULT_OWNER_ID` env var, which wins over no owner at all.
 ```
 
-- [ ] **Step 8.3: `docs/reference/companies-data.md` — add `loxo_create_company`**
+- [x] **Step 8.3: `docs/reference/companies-data.md` — add `loxo_create_company`**
 
 Add a new section mirroring the format of other tool references:
 
@@ -1022,7 +1022,7 @@ Create a new company record (client or target account).
 Claude calls `loxo_create_company` with `name="Acme Corp"`.
 ```
 
-- [ ] **Step 8.4: `docs/reference/activities-tasks.md` — document `activity_type_ids`**
+- [x] **Step 8.4: `docs/reference/activities-tasks.md` — document `activity_type_ids`**
 
 In the `loxo_get_candidate_activities` section, add or extend the inputs table/list:
 
@@ -1034,7 +1034,7 @@ In the `loxo_get_candidate_activities` section, add or extend the inputs table/l
 Claude calls `loxo_get_activity_types` to find the call type ID, then calls `loxo_get_candidate_activities` with `person_id="42"` and `activity_type_ids=["<call_id>"]`.
 ```
 
-- [ ] **Step 8.5: `docs/guides/adding-candidate.md` — mention automatic owner attachment**
+- [x] **Step 8.5: `docs/guides/adding-candidate.md` — mention automatic owner attachment**
 
 Add a short note in the workflow section (adapt wording to existing tone):
 
@@ -1042,12 +1042,12 @@ Add a short note in the workflow section (adapt wording to existing tone):
 > **Automatic owner assignment:** If `LOXO_DEFAULT_OWNER_ID` is configured in the server environment, newly-created candidates are automatically assigned to that Loxo user (typically you). You won't need a follow-up reassignment step. Override on a per-call basis by passing `owned_by_id` explicitly.
 ```
 
-- [ ] **Step 8.6: Build the docs site locally to verify Markdown renders**
+- [x] **Step 8.6: Build the docs site locally to verify Markdown renders**
 
 Run: `npm run docs:build`
 Expected: VitePress builds successfully, no dead-link warnings for the pages you edited.
 
-- [ ] **Step 8.7: Commit**
+- [x] **Step 8.7: Commit**
 
 ```bash
 git add docs/

@@ -31,6 +31,8 @@ You've sourced someone new and need to get them into Loxo with their full detail
 
 ## Tips
 
+> **Automatic owner assignment:** If `LOXO_DEFAULT_OWNER_ID` is configured in the server environment, newly-created candidates are automatically assigned to that Loxo user (typically you). No follow-up reassignment step needed. Override on a per-call basis by passing `owned_by_id` explicitly in your request.
+
 - Include a resume in the same request: "Add Jane Park as a candidate and here's her resume" — Claude will use `loxo_upload_resume` to attach it after creating the record
 - Let Claude pick the right skillsets: "Add her as a candidate with relevant engineering leadership skills" and Claude will search your skillset list for the best matches
 - Add multiple candidates in sequence: "Add these three people as candidates..." and Claude will create each one in turn
