@@ -62,7 +62,7 @@ Expected: no errors. Warnings about `no-explicit-any` are pre-existing and accep
 - Create: `tests/config.test.ts`
 - Modify: `src/config.ts`
 
-- [ ] **Step 1.1: Write the failing config tests**
+- [x] **Step 1.1: Write the failing config tests**
 
 Create `tests/config.test.ts`:
 
@@ -122,12 +122,12 @@ describe('validateEnv — LOXO_DEFAULT_OWNER_ID', () => {
 });
 ```
 
-- [ ] **Step 1.2: Run tests to verify they fail**
+- [x] **Step 1.2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/config.test.ts`
 Expected: FAIL — the tests expect a `LOXO_DEFAULT_OWNER_ID` field that doesn't exist in the schema.
 
-- [ ] **Step 1.3: Update `src/config.ts` to add the env var**
+- [x] **Step 1.3: Update `src/config.ts` to add the env var**
 
 Replace the contents of `src/config.ts` with:
 
@@ -169,17 +169,17 @@ export function validateEnv(): EnvConfig {
 }
 ```
 
-- [ ] **Step 1.4: Run tests to verify they pass**
+- [x] **Step 1.4: Run tests to verify they pass**
 
 Run: `npx vitest run tests/config.test.ts`
 Expected: PASS — all three tests green.
 
-- [ ] **Step 1.5: Run the full suite to confirm no regressions**
+- [x] **Step 1.5: Run the full suite to confirm no regressions**
 
 Run: `npm test`
 Expected: all tests pass.
 
-- [ ] **Step 1.6: Commit**
+- [x] **Step 1.6: Commit**
 
 ```bash
 git add tests/config.test.ts src/config.ts
