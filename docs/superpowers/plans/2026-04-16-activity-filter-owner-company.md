@@ -586,7 +586,7 @@ update call."
 - Modify: `src/server.ts` (tool def near line 1023; handler case near line 1579)
 - Modify: `tests/handlers.test.ts` (extend `describe('loxo_get_candidate_activities')` block near line 219)
 
-- [ ] **Step 4.1: Write the failing tests**
+- [x] **Step 4.1: Write the failing tests**
 
 Add these `it` blocks inside the existing `describe('loxo_get_candidate_activities', ...)` block in `tests/handlers.test.ts`:
 
@@ -640,12 +640,12 @@ Add these `it` blocks inside the existing `describe('loxo_get_candidate_activiti
     });
 ```
 
-- [ ] **Step 4.2: Run tests to verify they fail**
+- [x] **Step 4.2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_get_candidate_activities"`
 Expected: FAIL — handler ignores `activity_type_ids`; invalid inputs don't error.
 
-- [ ] **Step 4.3: Add a Zod schema for the activities filter**
+- [x] **Step 4.3: Add a Zod schema for the activities filter**
 
 Add this near the other activity-related Zod schemas in `src/server.ts` (for example right after `PersonEventSchema`, around line 360):
 
@@ -663,7 +663,7 @@ const GetCandidateActivitiesSchema = z.object({
 });
 ```
 
-- [ ] **Step 4.4: Extend the tool's `inputSchema` definition**
+- [x] **Step 4.4: Extend the tool's `inputSchema` definition**
 
 Find `loxo_get_candidate_activities` in `ListToolsRequestSchema` (near line 1023). Add the `activity_type_ids` property to `properties`:
 
@@ -681,7 +681,7 @@ Update the `description` string (append one sentence):
 description: "Get the full unfiltered activity history for a candidate — all calls, emails, meetings, notes, pipeline moves, and automation events. Returns most recent activities first. Optionally filter by activity_type_ids (use loxo_get_activity_types to discover IDs). For a filtered view with only intel-rich activities (excluding pipeline noise), use loxo_get_candidate_brief instead. For the recruiter's own call/intake notes (motivations, personal circumstances, compensation), check the 'description' field via loxo_get_candidate or loxo_get_candidate_brief. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
 ```
 
-- [ ] **Step 4.5: Update the handler case**
+- [x] **Step 4.5: Update the handler case**
 
 Find `case "loxo_get_candidate_activities":` (near line 1579) and replace its body with:
 
@@ -720,17 +720,17 @@ Find `case "loxo_get_candidate_activities":` (near line 1579) and replace its bo
       }
 ```
 
-- [ ] **Step 4.6: Run the new tests to verify they pass**
+- [x] **Step 4.6: Run the new tests to verify they pass**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_get_candidate_activities"`
 Expected: PASS — all five tests in the block green (one pre-existing + four new).
 
-- [ ] **Step 4.7: Run the full suite**
+- [x] **Step 4.7: Run the full suite**
 
 Run: `npm test`
 Expected: all tests pass.
 
-- [ ] **Step 4.8: Commit**
+- [x] **Step 4.8: Commit**
 
 ```bash
 git add tests/handlers.test.ts src/server.ts

@@ -365,6 +365,18 @@ const PersonEventSchema = z.object({
   created_at: z.string().optional(), // For scheduled events, set future datetime
 });
 
+const GetCandidateActivitiesSchema = z.object({
+  person_id: z.string().regex(/^\d+$/, "person_id must be numeric"),
+  per_page: z.number().int().positive().optional(),
+  scroll_id: z.string().optional(),
+  response_format: z.enum(['json', 'markdown']).optional(),
+  activity_type_ids: z
+    .array(z.string().regex(/^\d+$/, "activity_type_ids[] must all be numeric"))
+    .nonempty("activity_type_ids cannot be an empty array")
+    .optional()
+    .describe("Filter to only these activity types. Use loxo_get_activity_types to discover IDs."),
+});
+
 const SearchSchema = z.object({
     query: z.string().optional(),
     company: z.string().optional(),
@@ -1035,7 +1047,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_get_candidate_activities",
-        description: "Get the full unfiltered activity history for a candidate — all calls, emails, meetings, notes, pipeline moves, and automation events. Returns most recent activities first. For a filtered view with only intel-rich activities (excluding pipeline noise), use loxo_get_candidate_brief instead. For the recruiter's own call/intake notes (motivations, personal circumstances, compensation), check the 'description' field via loxo_get_candidate or loxo_get_candidate_brief. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
+        description: "Get the full unfiltered activity history for a candidate — all calls, emails, meetings, notes, pipeline moves, and automation events. Returns most recent activities first. Optionally filter by activity_type_ids (use loxo_get_activity_types to discover IDs). For a filtered view with only intel-rich activities (excluding pipeline noise), use loxo_get_candidate_brief instead. For the recruiter's own call/intake notes (motivations, personal circumstances, compensation), check the 'description' field via loxo_get_candidate or loxo_get_candidate_brief. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -1044,6 +1056,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             per_page: { type: "number", description: "Results per page (default 20)." },
             scroll_id: { type: "string", description: "Pagination cursor from previous response." },
             response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
+            activity_type_ids: {
+              type: "array",
+              items: { type: "string" },
+              description: "Optional filter to only specific activity types (e.g., only calls or only emails). Use loxo_get_activity_types first to discover IDs.",
+            },
           },
           required: ["person_id"],
         },
@@ -1601,12 +1618,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_get_candidate_activities": {
-        const { person_id, per_page, scroll_id, response_format = 'json' } = args as any;
+        const { person_id, per_page, scroll_id, response_format = 'json', activity_type_ids } = GetCandidateActivitiesSchema.parse(args);
 
         const params = new URLSearchParams();
-        params.append('person_id', person_id.toString());
+        params.append('person_id', person_id);
         if (per_page) params.append('per_page', per_page.toString());
         if (scroll_id) params.append('scroll_id', scroll_id);
+        if (activity_type_ids) {
+          for (const id of activity_type_ids) {
+            params.append('activity_type_ids[]', id);
+          }
+        }
 
         const apiResponse: any = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/person_events?${params.toString()}`

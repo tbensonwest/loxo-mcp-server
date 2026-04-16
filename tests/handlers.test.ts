@@ -229,6 +229,54 @@ describe('Loxo MCP tool handlers', () => {
       // Tool wraps in { results, pagination }
       expect(result.content[0].text).toContain('Called');
     });
+
+    it('forwards activity_type_ids[] as repeated query params', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person_events: [], total_count: 0, scroll_id: null })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_get_candidate_activities', {
+        person_id: '42',
+        activity_type_ids: ['7', '11'],
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('activity_type_ids%5B%5D=7');
+      expect(capturedUrl).toContain('activity_type_ids%5B%5D=11');
+    });
+
+    it('omits activity_type_ids when not provided (backward compat)', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person_events: [], total_count: 0, scroll_id: null })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_get_candidate_activities', { person_id: '42' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).not.toContain('activity_type_ids');
+    });
+
+    it('rejects non-numeric activity_type_ids element', async () => {
+      const result = await callTool(client, 'loxo_get_candidate_activities', {
+        person_id: '42',
+        activity_type_ids: ['abc'],
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('rejects empty activity_type_ids array', async () => {
+      const result = await callTool(client, 'loxo_get_candidate_activities', {
+        person_id: '42',
+        activity_type_ids: [],
+      });
+      expect(result.isError).toBe(true);
+    });
   });
 
   // ─── loxo_search_jobs ─────────────────────────────────────────────────────
