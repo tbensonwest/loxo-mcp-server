@@ -53,8 +53,9 @@ function requireNumericId(value: unknown, fieldName: string): string {
 
 // Resolves the owner ID for a write-to-person operation.
 // Precedence: explicit arg > LOXO_DEFAULT_OWNER_ID env var (validated) > undefined.
-// The env value is validated at call time (not just at startup) so that misconfigured
-// values are silently dropped rather than interpolated into form bodies.
+// Defense-in-depth: config.ts already rejects non-numeric values at startup via
+// process.exit(1). This runtime guard handles test-time env injection (vi.stubEnv)
+// and hypothetical future direct process.env mutations.
 function resolveOwnerId(explicitArg: string | undefined): string | undefined {
   if (explicitArg) return explicitArg;
   const envValue = process.env.LOXO_DEFAULT_OWNER_ID;
