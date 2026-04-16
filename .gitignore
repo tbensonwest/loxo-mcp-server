@@ -2,5 +2,8 @@
 .api
 node_modules
 .worktrees
+build
 docs/.vitepress/dist
 docs/.vitepress/cache
+.playwright-mcp
+.superpowers
