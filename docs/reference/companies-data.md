@@ -2,6 +2,38 @@
 
 Tools for searching companies, viewing company details, and looking up reference data (users, skillsets, source types, person types).
 
+## loxo_create_company
+
+Create a new company record (client or target account) in Loxo.
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Company name. Trimmed; must be non-empty. |
+
+### Returns
+
+The created company record as returned by the Loxo API.
+
+### Notes
+
+- Only the `name` field is accepted right now. Additional fields (url, description, company type, status) should be edited in the Loxo UI until a `loxo_update_company` tool is added.
+- The request body is sent as `application/x-www-form-urlencoded`: `company[name]=<name>`.
+
+### Example
+
+> "Add Acme Corp as a new client."
+
+Claude calls `loxo_create_company` with `name: "Acme Corp"`. The company record is now in Loxo and can be linked to jobs and activities.
+
+### Related tools
+
+- [`loxo_search_companies`](/reference/companies-data#loxo_search_companies) -- search for an existing company before creating a duplicate
+- [`loxo_get_company_details`](/reference/companies-data#loxo_get_company_details) -- view the full profile after creation
+
+---
+
 ## loxo_search_companies
 
 Search the company database using Lucene queries. Uses cursor-based pagination with scroll_id, similar to candidate search.

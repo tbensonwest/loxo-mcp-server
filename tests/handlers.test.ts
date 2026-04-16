@@ -34,6 +34,7 @@ describe('Loxo MCP tool handlers', () => {
 
   afterEach(async () => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     await client.close();
   });
 
@@ -228,6 +229,56 @@ describe('Loxo MCP tool handlers', () => {
       // Tool wraps in { results, pagination }
       expect(result.content[0].text).toContain('Called');
     });
+
+    it('forwards activity_type_ids[] as repeated query params', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person_events: [], total_count: 0, scroll_id: null })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_get_candidate_activities', {
+        person_id: '42',
+        activity_type_ids: ['7', '11'],
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('activity_type_ids%5B%5D=7');
+      expect(capturedUrl).toContain('activity_type_ids%5B%5D=11');
+    });
+
+    it('omits activity_type_ids when not provided (backward compat)', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person_events: [], total_count: 0, scroll_id: null })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_get_candidate_activities', { person_id: '42' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).not.toContain('activity_type_ids');
+    });
+
+    it('rejects non-numeric activity_type_ids element', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_get_candidate_activities', {
+        person_id: '42',
+        activity_type_ids: ['abc'],
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('rejects empty activity_type_ids array', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_get_candidate_activities', {
+        person_id: '42',
+        activity_type_ids: [],
+      });
+      expect(result.isError).toBe(true);
+    });
   });
 
   // ─── loxo_search_jobs ─────────────────────────────────────────────────────
@@ -271,6 +322,48 @@ describe('Loxo MCP tool handlers', () => {
     });
   });
 
+  // ─── loxo_create_company ──────────────────────────────────────────────────
+
+  describe('loxo_create_company', () => {
+    it('is listed in tools/list', async () => {
+      const result = await client.request({ method: 'tools/list' }, ListToolsResultSchema);
+      const tool = result.tools.find((t) => t.name === 'loxo_create_company');
+      expect(tool).toBeDefined();
+    });
+
+    it('POSTs company[name] form-encoded to /companies', async () => {
+      let capturedUrl = '';
+      let capturedMethod = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedMethod = opts?.method || 'GET';
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ company: { id: 500, name: 'TEST - Acme' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_company', { name: 'TEST - Acme' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedMethod).toBe('POST');
+      expect(capturedUrl).toContain('/test-agency/companies');
+      expect(capturedBody).toBe('company%5Bname%5D=TEST+-+Acme');
+    });
+
+    it('rejects missing name', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_company', {});
+      expect(result.isError).toBe(true);
+    });
+
+    it('rejects whitespace-only name', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_company', { name: '   ' });
+      expect(result.isError).toBe(true);
+    });
+  });
+
   // ─── loxo_create_candidate ────────────────────────────────────────────────
 
   describe('loxo_create_candidate', () => {
@@ -302,10 +395,100 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('returns error when required name is missing', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_create_candidate', {
         email: 'no-name@example.com',
       });
       expect(result.isError).toBe(true);
+    });
+
+    it('applies env default owner when LOXO_DEFAULT_OWNER_ID is set and no override given', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=42');
+    });
+
+    it('explicit owned_by_id overrides env default', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane',
+        owned_by_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+      expect(capturedBody).not.toContain('person%5Bowned_by_id%5D=42');
+    });
+
+    it('omits owned_by_id when neither env nor arg is provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
+    });
+
+    it('rejects non-numeric owned_by_id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane',
+        owned_by_id: 'abc',
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('silently ignores invalid LOXO_DEFAULT_OWNER_ID env value and omits owner', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', 'not-a-number');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
+    });
+
+    it('coerces numeric owned_by_id to string before sending', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane',
+        owned_by_id: 99 as unknown as string,
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
     });
   });
 
@@ -347,9 +530,108 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('returns error when only id is provided (empty body guard)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_update_candidate', { id: '42' });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('No fields provided to update');
+    });
+
+    it('applies env default owner on update when set and no override given', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        current_title: 'Senior Analyst',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=42');
+    });
+
+    it('explicit owned_by_id overrides env default on update', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        owned_by_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+      expect(capturedBody).not.toContain('person%5Bowned_by_id%5D=42');
+    });
+
+    it('omits owned_by_id on update when neither env nor arg is set (existing tags-only update still works)', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        tags: ['debt-advisory'],
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
+    });
+
+    it('rejects non-numeric owned_by_id on update', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        owned_by_id: 'abc',
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('accepts owned_by_id as the only field (env unset)', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        owned_by_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+    });
+
+    it('silently ignores invalid LOXO_DEFAULT_OWNER_ID env value on update and omits owner', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', 'not-a-number');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        current_title: 'Senior Analyst',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
     });
   });
 

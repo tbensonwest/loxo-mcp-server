@@ -11,11 +11,18 @@ Full unfiltered activity timeline for a candidate: all calls, emails, meetings, 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `person_id` | string | Yes | The candidate's person ID |
+| `activity_type_ids` | string[] | No | Restrict results to activities of these types only. Use `loxo_get_activity_types` to discover IDs. Rejected if empty; each element must be numeric. |
 | `per_page` | number | No | Results per page |
 | `scroll_id` | string | No | Pagination cursor from a previous request |
 | `response_format` | string | No | `"json"` or `"markdown"` |
 
-### Example
+### Example — filtered view
+
+> "Show me only the call activities for candidate 42."
+
+Claude calls `loxo_get_activity_types` to find the call type ID, then calls `loxo_get_candidate_activities` with `person_id: "42"` and `activity_type_ids: ["<call_id>"]`, returning only call-type activities.
+
+### Example — full timeline
 
 > "Show me everything that's happened with candidate 28194"
 

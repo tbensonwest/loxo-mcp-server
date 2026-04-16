@@ -12,6 +12,13 @@ const envSchema = z.object({
   LOXO_API_KEY: z.string().min(1, 'LOXO_API_KEY is required'),
   LOXO_DOMAIN: z.string().default('app.loxo.co'),
   LOXO_AGENCY_SLUG: z.string().min(1, 'LOXO_AGENCY_SLUG is required'),
+  LOXO_DEFAULT_OWNER_ID: z
+    .string()
+    .regex(
+      /^\d+$/,
+      'LOXO_DEFAULT_OWNER_ID must be a numeric user ID — use loxo_list_users to find yours'
+    )
+    .optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

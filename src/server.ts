@@ -51,6 +51,17 @@ function requireNumericId(value: unknown, fieldName: string): string {
   return str;
 }
 
+// Resolves the owner ID for a write-to-person operation.
+// Precedence: explicit arg > LOXO_DEFAULT_OWNER_ID env var (validated) > undefined.
+// Defense-in-depth: config.ts already rejects non-numeric values at startup via
+// process.exit(1). This runtime guard handles test-time env injection (vi.stubEnv)
+// and hypothetical future direct process.env mutations.
+function resolveOwnerId(explicitArg: string | undefined): string | undefined {
+  if (explicitArg) return explicitArg;
+  const envValue = process.env.LOXO_DEFAULT_OWNER_ID;
+  return envValue && /^\d+$/.test(envValue) ? envValue : undefined;
+}
+
 // Add these type definitions near the top with other types
 interface Person {
     id: string;
@@ -355,6 +366,18 @@ const PersonEventSchema = z.object({
   created_at: z.string().optional(), // For scheduled events, set future datetime
 });
 
+const GetCandidateActivitiesSchema = z.object({
+  person_id: z.coerce.string().regex(/^\d+$/, "person_id must be numeric"),
+  per_page: z.coerce.number().int().positive().optional(),
+  scroll_id: z.string().optional(),
+  response_format: z.enum(['json', 'markdown']).optional(),
+  activity_type_ids: z
+    .array(z.coerce.string().regex(/^\d+$/, "activity_type_ids[] must all be numeric"))
+    .nonempty("activity_type_ids cannot be an empty array")
+    .optional()
+    .describe("Filter to only these activity types. Use loxo_get_activity_types to discover IDs."),
+});
+
 const SearchSchema = z.object({
     query: z.string().optional(),
     company: z.string().optional(),
@@ -390,6 +413,11 @@ const GetCompanyDetailsSchema = z.object({
   company_id: z.number().int().describe("The ID of the company to retrieve.")
 });
 
+// Schema for create-company tool
+const CreateCompanySchema = z.object({
+  name: z.string().trim().min(1, "name is required").describe("Company name (required)."),
+});
+
 // Schema for list-users tool
 const ListUsersSchema = z.object({}); // No specific input parameters
 
@@ -409,6 +437,7 @@ const CreateCandidateSchema = z.object({
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
+  owned_by_id: z.coerce.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
 });
 
 const UpdateCandidateSchema = z.object({
@@ -424,6 +453,7 @@ const UpdateCandidateSchema = z.object({
   sector_ids: z.array(z.number().int()).optional().describe("Sector hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5690364] for Financial Services."),
   person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
   source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
+  owned_by_id: z.coerce.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
 });
 
 const AddToPipelineSchema = z.object({
@@ -959,6 +989,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "loxo_create_company",
+        description: "Create a new company (client/target account) record in Loxo. Currently only the name is accepted; additional fields (url, description, status) should be edited in the Loxo UI for now. Use after discovering a new client or target account during a conversation. Example: 'Add Acme Corp as a new client' → call this with name='Acme Corp'.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Company name (required)." },
+          },
+          required: ["name"],
+        },
+      },
+      {
         name: "loxo_list_users",
         description: "Get all users in your Loxo agency (recruiters, coordinators, etc.) with names and emails. Use this to find user_id values for filtering scheduled tasks or assigning ownership. Example: Get all recruiters to see who owns which candidates or to filter tasks by specific team member.",
         inputSchema: {
@@ -981,7 +1023,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_create_candidate",
-        description: "Create a new candidate record in Loxo with name, contact info, and current role. Source type is auto-set to 'API'. After creating, use loxo_update_candidate to set tags, skillsets, person_type, source_type, and sector — these fields require a separate PUT call. Example workflow: (1) loxo_create_candidate with name/email/phone/title/company, (2) loxo_update_candidate to add tags and skillset, (3) loxo_add_to_pipeline to add to a job.",
+        description: "Create a new candidate record in Loxo with name, contact info, and current role. Source type is auto-set to 'API'. Owner is set from the optional owned_by_id arg, or falls back to the LOXO_DEFAULT_OWNER_ID env var if configured. After creating, use loxo_update_candidate to set tags, skillsets, person_type, source_type, and sector — these fields require a separate PUT call. Example workflow: (1) loxo_create_candidate with name/email/phone/title/company, (2) loxo_update_candidate to add tags and skillset, (3) loxo_add_to_pipeline to add to a job.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -992,13 +1034,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
+            owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var if set." },
           },
           required: ["name"],
         },
       },
       {
         name: "loxo_update_candidate",
-        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling.",
+        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling. Ownership can be set via owned_by_id (falls back to LOXO_DEFAULT_OWNER_ID env var).",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -1015,13 +1058,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             sector_ids: { type: "array", items: { type: "number" }, description: "Sector IDs from loxo_list_skillsets. E.g. [5690364] = Financial Services." },
             person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
             source_type_id: { type: "number", description: "Source type ID. 1206583=LinkedIn, 1206592=API." },
+            owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var." },
           },
           required: ["id"],
         },
       },
       {
         name: "loxo_get_candidate_activities",
-        description: "Get the full unfiltered activity history for a candidate — all calls, emails, meetings, notes, pipeline moves, and automation events. Returns most recent activities first. For a filtered view with only intel-rich activities (excluding pipeline noise), use loxo_get_candidate_brief instead. For the recruiter's own call/intake notes (motivations, personal circumstances, compensation), check the 'description' field via loxo_get_candidate or loxo_get_candidate_brief. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
+        description: "Get the full unfiltered activity history for a candidate — all calls, emails, meetings, notes, pipeline moves, and automation events. Returns most recent activities first. Optionally filter by activity_type_ids (use loxo_get_activity_types to discover IDs). For a filtered view with only intel-rich activities (excluding pipeline noise), use loxo_get_candidate_brief instead. For the recruiter's own call/intake notes (motivations, personal circumstances, compensation), check the 'description' field via loxo_get_candidate or loxo_get_candidate_brief. Example: Before emailing a candidate, call this to check if someone already contacted them last week.",
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -1030,6 +1074,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             per_page: { type: "number", description: "Results per page (default 20)." },
             scroll_id: { type: "string", description: "Pagination cursor from previous response." },
             response_format: { type: "string", enum: ["json", "markdown"], description: "Response format: 'json' (default) or 'markdown'." },
+            activity_type_ids: {
+              type: "array",
+              items: { type: "string" },
+              description: "Optional filter to only specific activity types (e.g., only calls or only emails). Use loxo_get_activity_types first to discover IDs.",
+            },
           },
           required: ["person_id"],
         },
@@ -1505,7 +1554,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_create_candidate": {
-        const { name, email, phone, current_title, current_company, location } = CreateCandidateSchema.parse(args);
+        const { name, email, phone, current_title, current_company, location, owned_by_id } = CreateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         formData.append('person[name]', name);
@@ -1514,6 +1563,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (current_title) formData.append('person[title]', current_title);
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
+
+        const resolvedOwnerId = resolveOwnerId(owned_by_id);
+        if (resolvedOwnerId) {
+          formData.append('person[owned_by_id]', resolvedOwnerId);
+        }
 
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people`,
@@ -1529,7 +1583,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
@@ -1556,6 +1610,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           }
         }
 
+        const resolvedOwnerId = resolveOwnerId(owned_by_id);
+        if (resolvedOwnerId) {
+          formData.append('person[owned_by_id]', resolvedOwnerId);
+        }
+
         if (formData.toString() === '') {
           return {
             content: [{ type: "text", text: "No fields provided to update. Supply at least one optional field alongside id." }],
@@ -1576,13 +1635,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case "loxo_create_company": {
+        const { name } = CreateCompanySchema.parse(args);
+
+        const formData = new URLSearchParams();
+        formData.append('company[name]', name);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/companies`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
       case "loxo_get_candidate_activities": {
-        const { person_id, per_page, scroll_id, response_format = 'json' } = args as any;
+        const { person_id, per_page, scroll_id, response_format = 'json', activity_type_ids } = GetCandidateActivitiesSchema.parse(args);
 
         const params = new URLSearchParams();
-        params.append('person_id', person_id.toString());
+        params.append('person_id', person_id);
         if (per_page) params.append('per_page', per_page.toString());
         if (scroll_id) params.append('scroll_id', scroll_id);
+        if (activity_type_ids) {
+          for (const id of activity_type_ids) {
+            params.append('activity_type_ids[]', id);
+          }
+        }
 
         const apiResponse: any = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/person_events?${params.toString()}`

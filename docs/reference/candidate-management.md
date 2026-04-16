@@ -16,6 +16,9 @@ Create a new candidate record with name, contact info, and current role. The can
 | `current_title` | string | No | Current job title |
 | `current_company` | string | No | Current employer |
 | `location` | string | No | City, region, or country |
+| `owned_by_id` | string | No | Loxo user ID to set as record owner. If omitted, falls back to the `LOXO_DEFAULT_OWNER_ID` env var (if configured). If neither is set, the record is created without an owner. |
+
+> **Ownership precedence:** explicit `owned_by_id` arg wins over the `LOXO_DEFAULT_OWNER_ID` env var, which wins over no owner at all.
 
 ### Example
 
@@ -51,6 +54,9 @@ Update an existing candidate's details: profile fields, tags, skillsets, sector 
 | `sector_ids` | array of numbers | No | Sector IDs (from `loxo_list_skillsets`) |
 | `person_type_id` | number | No | Person type ID (from `loxo_list_person_types`) |
 | `source_type_id` | number | No | Source type ID (from `loxo_list_source_types`) |
+| `owned_by_id` | string | No | Loxo user ID to set as record owner. If omitted, falls back to the `LOXO_DEFAULT_OWNER_ID` env var (if configured). If neither is set, the record is updated without changing ownership. |
+
+> **Ownership precedence:** explicit `owned_by_id` arg wins over the `LOXO_DEFAULT_OWNER_ID` env var, which wins over no owner at all.
 
 ### Example
 
