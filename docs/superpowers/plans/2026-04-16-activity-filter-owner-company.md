@@ -150,7 +150,7 @@ const envSchema = z.object({
     .string()
     .regex(
       /^\d+$/,
-      'LOXO_DEFAULT_OWNER_ID must be a numeric user ID — use loxo_get_users to find yours'
+      'LOXO_DEFAULT_OWNER_ID must be a numeric user ID — use loxo_list_users to find yours'
     )
     .optional(),
 });
@@ -186,7 +186,7 @@ git add tests/config.test.ts src/config.ts
 git commit -m "feat(config): add optional LOXO_DEFAULT_OWNER_ID env var
 
 Validates as a numeric string; fails fast with actionable message
-pointing users at loxo_get_users. Absent = current behavior."
+pointing users at loxo_list_users. Absent = current behavior."
 ```
 
 ---
@@ -922,7 +922,7 @@ Open `README.md`. Locate the project title / tagline at the top. Immediately aft
 Locate the environment-variables section (search for `LOXO_API_KEY`). Add a new row to the table (or list) mirroring the existing format:
 
 ```markdown
-| `LOXO_DEFAULT_OWNER_ID` | No | Default Loxo user ID to set as `owned_by_id` on candidates created or updated via this server. Find your ID via `loxo_get_users`. |
+| `LOXO_DEFAULT_OWNER_ID` | No | Default Loxo user ID to set as `owned_by_id` on candidates created or updated via this server. Find your ID via `loxo_list_users`. |
 ```
 
 - [x] **Step 7.3: Add `loxo_create_company` to the tool list**
@@ -974,7 +974,7 @@ Find the env-var / configuration section. Add a subsection or table row:
 
 A Loxo user ID (integer, as a string). When set, every candidate created or updated via `loxo_create_candidate` / `loxo_update_candidate` will have this user assigned as `owned_by_id` — unless the call explicitly passes its own `owned_by_id` override.
 
-**How to find your user ID:** ask Claude to run `loxo_get_users` and look up your name.
+**How to find your user ID:** ask Claude to run `loxo_list_users` and look up your name.
 
 **If not set:** candidates are created without an owner (existing behaviour).
 ```

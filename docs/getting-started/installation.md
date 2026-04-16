@@ -71,7 +71,7 @@ LOXO_AGENCY_SLUG=your_agency_slug
 
 A numeric Loxo user ID (stored as a string). When set, every candidate created or updated via `loxo_create_candidate` or `loxo_update_candidate` is assigned this user as `owned_by_id` — unless the call explicitly passes its own `owned_by_id` override.
 
-**How to find your user ID:** ask Claude to run `loxo_get_users` and look up your name in the results.
+**How to find your user ID:** ask Claude to run `loxo_list_users` and look up your name in the results.
 
 **If not set:** candidates are created without an owner, which is the existing behaviour.
 

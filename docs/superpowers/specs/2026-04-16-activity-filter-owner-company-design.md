@@ -40,7 +40,7 @@ The primary user is a full-desk recruiter (wife of the repo owner) operating in 
 
 ### Feature 2 — Candidate owner
 
-**New env var:** `LOXO_DEFAULT_OWNER_ID` (optional, numeric string). Validated at module load in `src/config.ts`. If set but non-numeric, fail fast with a message pointing the user at `loxo_get_users`.
+**New env var:** `LOXO_DEFAULT_OWNER_ID` (optional, numeric string). Validated at module load in `src/config.ts`. If set but non-numeric, fail fast with a message pointing the user at `loxo_list_users`.
 
 **Tool changes:** `loxo_create_candidate` and `loxo_update_candidate` each gain an optional `owned_by_id: string` input.
 
@@ -143,7 +143,7 @@ Validation errors (non-numeric IDs, empty arrays, missing required fields) short
 | Doc | Change |
 |---|---|
 | `README.md` | Add docs-site link near the top; add `LOXO_DEFAULT_OWNER_ID` to env var table; add `loxo_create_company` to the tool list; mention `activity_type_ids` filter on activities. |
-| `docs/getting-started/installation.md` (or config page) | Document `LOXO_DEFAULT_OWNER_ID` — purpose, how to obtain the ID via `loxo_get_users`, optional. |
+| `docs/getting-started/installation.md` (or config page) | Document `LOXO_DEFAULT_OWNER_ID` — purpose, how to obtain the ID via `loxo_list_users`, optional. |
 | `docs/reference/candidates.md` | Document new `owned_by_id` param on create/update; explain env default and override precedence. |
 | `docs/reference/companies-data.md` | Add `loxo_create_company` section. |
 | `docs/reference/activities-tasks.md` | Document new `activity_type_ids` param on `loxo_get_candidate_activities`; example showing use with `loxo_get_activity_types`. |
