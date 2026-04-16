@@ -435,6 +435,7 @@ const UpdateCandidateSchema = z.object({
   sector_ids: z.array(z.number().int()).optional().describe("Sector hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5690364] for Financial Services."),
   person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
   source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
+  owned_by_id: z.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
 });
 
 const AddToPipelineSchema = z.object({
@@ -1010,7 +1011,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_update_candidate",
-        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling.",
+        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling. Ownership can be set via owned_by_id (falls back to LOXO_DEFAULT_OWNER_ID env var).",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -1027,6 +1028,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             sector_ids: { type: "array", items: { type: "number" }, description: "Sector IDs from loxo_list_skillsets. E.g. [5690364] = Financial Services." },
             person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
             source_type_id: { type: "number", description: "Source type ID. 1206583=LinkedIn, 1206592=API." },
+            owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var." },
           },
           required: ["id"],
         },
@@ -1546,7 +1548,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
@@ -1571,6 +1573,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           for (const sid of sector_ids) {
             formData.append('person[custom_hierarchy_2][]', sid.toString());
           }
+        }
+
+        const resolvedOwnerId = resolveOwnerId(owned_by_id);
+        if (resolvedOwnerId) {
+          formData.append('person[owned_by_id]', resolvedOwnerId);
         }
 
         if (formData.toString() === '') {

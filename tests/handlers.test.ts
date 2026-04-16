@@ -423,6 +423,103 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('No fields provided to update');
     });
+
+    it('applies env default owner on update when set and no override given', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        current_title: 'Senior Analyst',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=42');
+    });
+
+    it('explicit owned_by_id overrides env default on update', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        owned_by_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+      expect(capturedBody).not.toContain('person%5Bowned_by_id%5D=42');
+    });
+
+    it('omits owned_by_id on update when neither env nor arg is set (existing tags-only update still works)', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        tags: ['debt-advisory'],
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
+    });
+
+    it('rejects non-numeric owned_by_id on update', async () => {
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        owned_by_id: 'abc',
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('accepts owned_by_id as the only field (env unset)', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        owned_by_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+    });
+
+    it('silently ignores invalid LOXO_DEFAULT_OWNER_ID env value on update and omits owner', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', 'not-a-number');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        current_title: 'Senior Analyst',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
+    });
   });
 
   // ─── loxo_apply_to_job ────────────────────────────────────────────────────

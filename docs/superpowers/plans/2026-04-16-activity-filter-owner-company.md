@@ -366,7 +366,7 @@ Backward compatible when neither is set."
 - Modify: `src/server.ts` (UpdateCandidateSchema near line 414; `loxo_update_candidate` tool def near line 1000; handler case near line 1531)
 - Modify: `tests/handlers.test.ts` (extend `describe('loxo_update_candidate')` block near line 314)
 
-- [ ] **Step 3.1: Write the failing tests**
+- [x] **Step 3.1: Write the failing tests**
 
 Add these `it` blocks inside the existing `describe('loxo_update_candidate', ...)` block in `tests/handlers.test.ts`:
 
@@ -453,12 +453,12 @@ Add these `it` blocks inside the existing `describe('loxo_update_candidate', ...
     });
 ```
 
-- [ ] **Step 3.2: Run tests to verify they fail**
+- [x] **Step 3.2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_update_candidate"`
 Expected: FAIL — schema doesn't know `owned_by_id`, handler never appends it.
 
-- [ ] **Step 3.3: Extend `UpdateCandidateSchema`**
+- [x] **Step 3.3: Extend `UpdateCandidateSchema`**
 
 Find `UpdateCandidateSchema` in `src/server.ts` (near line 414) and add `owned_by_id`:
 
@@ -480,7 +480,7 @@ const UpdateCandidateSchema = z.object({
 });
 ```
 
-- [ ] **Step 3.4: Extend the tool's `inputSchema` definition**
+- [x] **Step 3.4: Extend the tool's `inputSchema` definition**
 
 Find `loxo_update_candidate` in `ListToolsRequestSchema` (near line 1000). Add `owned_by_id` property after `source_type_id`:
 
@@ -494,7 +494,7 @@ Update the `description` string (append):
 description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling. Ownership can be set via owned_by_id (falls back to LOXO_DEFAULT_OWNER_ID env var).",
 ```
 
-- [ ] **Step 3.5: Update the handler case for `loxo_update_candidate`**
+- [x] **Step 3.5: Update the handler case for `loxo_update_candidate`**
 
 Find `case "loxo_update_candidate":` (near line 1531) and update the destructure and append block. Replace the handler body (everything between `case "loxo_update_candidate": {` and the corresponding closing `}`) with:
 
@@ -555,17 +555,17 @@ Find `case "loxo_update_candidate":` (near line 1531) and update the destructure
 
 Note: `owned_by_id` appending happens BEFORE the empty-body guard, so "just set owner" counts as a valid update. The pre-existing `"returns error when only id is provided"` test still passes because no owner is set.
 
-- [ ] **Step 3.6: Run the new tests to verify they pass**
+- [x] **Step 3.6: Run the new tests to verify they pass**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_update_candidate"`
 Expected: PASS — all seven tests in the block green (two pre-existing + five new).
 
-- [ ] **Step 3.7: Run the full suite to confirm no regressions**
+- [x] **Step 3.7: Run the full suite to confirm no regressions**
 
 Run: `npm test`
 Expected: all tests pass.
 
-- [ ] **Step 3.8: Commit**
+- [x] **Step 3.8: Commit**
 
 ```bash
 git add tests/handlers.test.ts src/server.ts
