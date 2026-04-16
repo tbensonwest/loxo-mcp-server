@@ -751,7 +751,7 @@ Omitting the param preserves current behavior."
 - Modify: `src/server.ts` (new schema near line 410; new tool def in `ListToolsRequestSchema`; new handler case)
 - Modify: `tests/handlers.test.ts` (new `describe` block)
 
-- [ ] **Step 5.1: Write the failing tests**
+- [x] **Step 5.1: Write the failing tests**
 
 Add a new `describe` block in `tests/handlers.test.ts`, after the existing `describe('loxo_search_companies', ...)` block:
 
@@ -797,12 +797,12 @@ Add a new `describe` block in `tests/handlers.test.ts`, after the existing `desc
   });
 ```
 
-- [ ] **Step 5.2: Run tests to verify they fail**
+- [x] **Step 5.2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_create_company"`
 Expected: FAIL — tool doesn't exist; all four tests fail.
 
-- [ ] **Step 5.3: Add `CreateCompanySchema`**
+- [x] **Step 5.3: Add `CreateCompanySchema`**
 
 Add near the other company schemas in `src/server.ts` (for example right after `GetCompanyDetailsSchema` around line 390):
 
@@ -812,7 +812,7 @@ const CreateCompanySchema = z.object({
 });
 ```
 
-- [ ] **Step 5.4: Add the tool definition**
+- [x] **Step 5.4: Add the tool definition**
 
 In `ListToolsRequestSchema` handler, add a new entry immediately after the `loxo_search_companies` entry (adjust location as needed — place it near other company tools for readability):
 
@@ -831,7 +831,7 @@ In `ListToolsRequestSchema` handler, add a new entry immediately after the `loxo
       },
 ```
 
-- [ ] **Step 5.5: Add the handler case**
+- [x] **Step 5.5: Add the handler case**
 
 In the `CallToolRequestSchema` switch, add a new case (place it near the other write tools, e.g., right after `case "loxo_update_candidate":` block):
 
@@ -856,17 +856,17 @@ In the `CallToolRequestSchema` switch, add a new case (place it near the other w
       }
 ```
 
-- [ ] **Step 5.6: Run the new tests**
+- [x] **Step 5.6: Run the new tests**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_create_company"`
 Expected: PASS — all four tests green.
 
-- [ ] **Step 5.7: Run the full suite**
+- [x] **Step 5.7: Run the full suite**
 
 Run: `npm test`
 Expected: all tests pass.
 
-- [ ] **Step 5.8: Commit**
+- [x] **Step 5.8: Commit**
 
 ```bash
 git add tests/handlers.test.ts src/server.ts

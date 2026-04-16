@@ -322,6 +322,48 @@ describe('Loxo MCP tool handlers', () => {
     });
   });
 
+  // ─── loxo_create_company ──────────────────────────────────────────────────
+
+  describe('loxo_create_company', () => {
+    it('is listed in tools/list', async () => {
+      const result = await client.request({ method: 'tools/list' }, ListToolsResultSchema);
+      const tool = result.tools.find((t) => t.name === 'loxo_create_company');
+      expect(tool).toBeDefined();
+    });
+
+    it('POSTs company[name] form-encoded to /companies', async () => {
+      let capturedUrl = '';
+      let capturedMethod = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedMethod = opts?.method || 'GET';
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ company: { id: 500, name: 'TEST - Acme' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_company', { name: 'TEST - Acme' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedMethod).toBe('POST');
+      expect(capturedUrl).toContain('/test-agency/companies');
+      expect(capturedBody).toBe('company%5Bname%5D=TEST+-+Acme');
+    });
+
+    it('rejects missing name', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_company', {});
+      expect(result.isError).toBe(true);
+    });
+
+    it('rejects whitespace-only name', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_company', { name: '   ' });
+      expect(result.isError).toBe(true);
+    });
+  });
+
   // ─── loxo_create_candidate ────────────────────────────────────────────────
 
   describe('loxo_create_candidate', () => {

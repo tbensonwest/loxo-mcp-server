@@ -412,6 +412,11 @@ const GetCompanyDetailsSchema = z.object({
   company_id: z.number().int().describe("The ID of the company to retrieve.")
 });
 
+// Schema for create-company tool
+const CreateCompanySchema = z.object({
+  name: z.string().trim().min(1, "name is required").describe("Company name (required)."),
+});
+
 // Schema for list-users tool
 const ListUsersSchema = z.object({}); // No specific input parameters
 
@@ -980,6 +985,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           destructiveHint: false,
           idempotentHint: true,
           openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_create_company",
+        description: "Create a new company (client/target account) record in Loxo. Currently only the name is accepted; additional fields (url, description, status) should be edited in the Loxo UI for now. Use after discovering a new client or target account during a conversation. Example: 'Add Acme Corp as a new client' → call this with name='Acme Corp'.",
+        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Company name (required)." },
+          },
+          required: ["name"],
         },
       },
       {
@@ -1608,6 +1625,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           `/${env.LOXO_AGENCY_SLUG}/people/${id}`,
           {
             method: 'PUT',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_create_company": {
+        const { name } = CreateCompanySchema.parse(args);
+
+        const formData = new URLSearchParams();
+        formData.append('company[name]', name);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/companies`,
+          {
+            method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: formData.toString(),
           }
