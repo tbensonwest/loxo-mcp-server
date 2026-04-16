@@ -3,6 +3,8 @@
 
 # Loxo MCP Server
 
+**📚 Documentation:** https://tbensonwest.github.io/loxo-mcp-server/
+
 A Model Context Protocol (MCP) server that gives Claude direct access to the Loxo recruitment platform. Version 1.5.0 provides 28 tools covering the full recruiter workflow: searching and researching candidates, managing job pipelines, tracking activity and communication, working with companies, and maintaining candidate records. Tool descriptions guide Claude to surface recruiter intake notes and intel-rich activity history — so it can answer "where did we leave things with this candidate?" without you having to dig.
 
 <a href="https://glama.ai/mcp/servers/rj00ooup46"><img width="380" height="200" src="https://glama.ai/mcp/servers/rj00ooup46/badge" alt="Loxo Server MCP server" /></a>
@@ -67,6 +69,7 @@ Required environment variables:
 - `LOXO_API_KEY`: Your Loxo API key
 - `LOXO_AGENCY_SLUG`: Your agency's slug in Loxo
 - `LOXO_DOMAIN`: (Optional) Defaults to 'app.loxo.co'
+- `LOXO_DEFAULT_OWNER_ID`: (Optional) Default Loxo user ID to set as `owned_by_id` on candidates created or updated via this server. Find your ID via `loxo_get_users`. Falls back to no owner if not set; overridden per-call by the `owned_by_id` arg.
 
 ### Docker Configuration
 
@@ -206,7 +209,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 ### Track Activity & Communication
 
-- **`loxo_get_candidate_activities`** — Full unfiltered activity timeline for a candidate: all calls, emails, meetings, notes, pipeline moves, and automation events, most recent first. Use when you need the complete raw history. For a cleaner, intel-focused view, use `loxo_get_candidate_brief` instead.
+- **`loxo_get_candidate_activities`** — Full activity timeline for a candidate: all calls, emails, meetings, notes, pipeline moves, and automation events, most recent first. Optionally filter by `activity_type_ids` (use `loxo_get_activity_types` to discover IDs). For a cleaner, intel-focused view, use `loxo_get_candidate_brief` instead.
 - **`loxo_log_activity`** — Record a completed activity (call, email, meeting, interview) against a candidate. Use `loxo_get_activity_types` first to find the correct activity type ID.
 - **`loxo_schedule_activity`** — Create a future activity (call, meeting, interview) for a candidate. Use `loxo_get_activity_types` first to find the correct activity type ID.
 - **`loxo_get_todays_tasks`** — All scheduled items for today (or a date range you specify). Optionally filter by user.
@@ -214,6 +217,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 ### Companies & Reference Data
 
+- **`loxo_create_company`** — Create a new company (client/target account). Currently accepts only `name`.
 - **`loxo_search_companies`** — Search the company database using Lucene queries. Uses cursor-based pagination with `scroll_id`.
 - **`loxo_get_company_details`** — Full company profile including description, contacts, relationships, and status.
 - **`loxo_list_users`** — All users in your Loxo agency (recruiters, coordinators, etc.) with names and emails. Use to find `user_id` values for filtering tasks or checking record ownership.
