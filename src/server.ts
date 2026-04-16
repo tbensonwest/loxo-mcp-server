@@ -409,6 +409,7 @@ const CreateCandidateSchema = z.object({
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
+  owned_by_id: z.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
 });
 
 const UpdateCandidateSchema = z.object({
@@ -981,7 +982,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_create_candidate",
-        description: "Create a new candidate record in Loxo with name, contact info, and current role. Source type is auto-set to 'API'. After creating, use loxo_update_candidate to set tags, skillsets, person_type, source_type, and sector — these fields require a separate PUT call. Example workflow: (1) loxo_create_candidate with name/email/phone/title/company, (2) loxo_update_candidate to add tags and skillset, (3) loxo_add_to_pipeline to add to a job.",
+        description: "Create a new candidate record in Loxo with name, contact info, and current role. Source type is auto-set to 'API'. Owner is set from the optional owned_by_id arg, or falls back to the LOXO_DEFAULT_OWNER_ID env var if configured. After creating, use loxo_update_candidate to set tags, skillsets, person_type, source_type, and sector — these fields require a separate PUT call. Example workflow: (1) loxo_create_candidate with name/email/phone/title/company, (2) loxo_update_candidate to add tags and skillset, (3) loxo_add_to_pipeline to add to a job.",
         annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
         inputSchema: {
           type: "object",
@@ -992,6 +993,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
+            owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var if set." },
           },
           required: ["name"],
         },
@@ -1505,7 +1507,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_create_candidate": {
-        const { name, email, phone, current_title, current_company, location } = CreateCandidateSchema.parse(args);
+        const { name, email, phone, current_title, current_company, location, owned_by_id } = CreateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         formData.append('person[name]', name);
@@ -1514,6 +1516,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (current_title) formData.append('person[title]', current_title);
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
+
+        // Read at call time (not module-load time) so vi.stubEnv works in tests and
+        // so the value reflects runtime config changes. Validated inline with regex.
+        const envDefaultOwnerId = process.env.LOXO_DEFAULT_OWNER_ID;
+        const resolvedOwnerId = owned_by_id ?? (/^\d+$/.test(envDefaultOwnerId ?? '') ? envDefaultOwnerId : undefined);
+        if (resolvedOwnerId) {
+          formData.append('person[owned_by_id]', resolvedOwnerId);
+        }
 
         const response = await makeRequest(
           `/${env.LOXO_AGENCY_SLUG}/people`,

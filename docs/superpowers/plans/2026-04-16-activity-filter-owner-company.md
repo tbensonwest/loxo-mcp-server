@@ -199,7 +199,7 @@ pointing users at loxo_get_users. Absent = current behavior."
 - Modify: `src/server.ts` (CreateCandidateSchema near line 405; `loxo_create_candidate` tool def near line 983; handler case near line 1507)
 - Modify: `tests/handlers.test.ts` (extend `describe('loxo_create_candidate')` block near line 276)
 
-- [ ] **Step 2.1: Write the failing tests**
+- [x] **Step 2.1: Write the failing tests**
 
 Add these `it` blocks inside the existing `describe('loxo_create_candidate', ...)` block in `tests/handlers.test.ts` (after the existing two tests, before the block's closing `});`):
 
@@ -263,12 +263,12 @@ Add these `it` blocks inside the existing `describe('loxo_create_candidate', ...
     });
 ```
 
-- [ ] **Step 2.2: Run tests to verify they fail**
+- [x] **Step 2.2: Run tests to verify they fail**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_create_candidate"`
 Expected: FAIL — `owned_by_id` is not sent; Zod accepts any string for it.
 
-- [ ] **Step 2.3: Extend `CreateCandidateSchema` in `src/server.ts`**
+- [x] **Step 2.3: Extend `CreateCandidateSchema` in `src/server.ts`**
 
 Find `CreateCandidateSchema` (near line 405) and add the `owned_by_id` field:
 
@@ -284,7 +284,7 @@ const CreateCandidateSchema = z.object({
 });
 ```
 
-- [ ] **Step 2.4: Extend the tool's `inputSchema` definition**
+- [x] **Step 2.4: Extend the tool's `inputSchema` definition**
 
 Find the `loxo_create_candidate` tool entry in the `ListToolsRequestSchema` handler (near line 983) and add `owned_by_id` to both `properties` and `description`:
 
@@ -300,7 +300,7 @@ Add this property to the `properties` block (after `location`):
             owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var if set." },
 ```
 
-- [ ] **Step 2.5: Update the handler case for `loxo_create_candidate`**
+- [x] **Step 2.5: Update the handler case for `loxo_create_candidate`**
 
 Find `case "loxo_create_candidate":` (near line 1507) and replace its body with:
 
@@ -335,17 +335,17 @@ Find `case "loxo_create_candidate":` (near line 1507) and replace its body with:
       }
 ```
 
-- [ ] **Step 2.6: Run the new tests to verify they pass**
+- [x] **Step 2.6: Run the new tests to verify they pass**
 
 Run: `npx vitest run tests/handlers.test.ts -t "loxo_create_candidate"`
 Expected: PASS — all six tests in the block green (two pre-existing + four new).
 
-- [ ] **Step 2.7: Run the full suite to confirm no regressions**
+- [x] **Step 2.7: Run the full suite to confirm no regressions**
 
 Run: `npm test`
 Expected: all tests pass. (The pre-existing `person[email]` / `person[phone]` test in `loxo_create_candidate` must still pass — `owned_by_id` is only appended when resolved.)
 
-- [ ] **Step 2.8: Commit**
+- [x] **Step 2.8: Commit**
 
 ```bash
 git add tests/handlers.test.ts src/server.ts

@@ -307,6 +307,64 @@ describe('Loxo MCP tool handlers', () => {
       });
       expect(result.isError).toBe(true);
     });
+
+    it('applies env default owner when LOXO_DEFAULT_OWNER_ID is set and no override given', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=42');
+      vi.unstubAllEnvs();
+    });
+
+    it('explicit owned_by_id overrides env default', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', '42');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane',
+        owned_by_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+      expect(capturedBody).not.toContain('person%5Bowned_by_id%5D=42');
+      vi.unstubAllEnvs();
+    });
+
+    it('omits owned_by_id when neither env nor arg is provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
+    });
+
+    it('rejects non-numeric owned_by_id', async () => {
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane',
+        owned_by_id: 'abc',
+      });
+      expect(result.isError).toBe(true);
+    });
   });
 
   // ─── loxo_update_candidate ────────────────────────────────────────────────
