@@ -34,6 +34,7 @@ describe('Loxo MCP tool handlers', () => {
 
   afterEach(async () => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     await client.close();
   });
 
@@ -321,7 +322,6 @@ describe('Loxo MCP tool handlers', () => {
       const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
       expect(result.isError).toBeFalsy();
       expect(capturedBody).toContain('person%5Bowned_by_id%5D=42');
-      vi.unstubAllEnvs();
     });
 
     it('explicit owned_by_id overrides env default', async () => {
@@ -341,7 +341,6 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.isError).toBeFalsy();
       expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
       expect(capturedBody).not.toContain('person%5Bowned_by_id%5D=42');
-      vi.unstubAllEnvs();
     });
 
     it('omits owned_by_id when neither env nor arg is provided', async () => {
@@ -364,6 +363,21 @@ describe('Loxo MCP tool handlers', () => {
         owned_by_id: 'abc',
       });
       expect(result.isError).toBe(true);
+    });
+
+    it('silently ignores invalid LOXO_DEFAULT_OWNER_ID env value and omits owner', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_ID', 'not-a-number');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', { name: 'TEST - Jane' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).not.toContain('owned_by_id');
     });
   });
 

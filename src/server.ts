@@ -51,6 +51,16 @@ function requireNumericId(value: unknown, fieldName: string): string {
   return str;
 }
 
+// Resolves the owner ID for a write-to-person operation.
+// Precedence: explicit arg > LOXO_DEFAULT_OWNER_ID env var (validated) > undefined.
+// The env value is validated at call time (not just at startup) so that misconfigured
+// values are silently dropped rather than interpolated into form bodies.
+function resolveOwnerId(explicitArg: string | undefined): string | undefined {
+  if (explicitArg) return explicitArg;
+  const envValue = process.env.LOXO_DEFAULT_OWNER_ID;
+  return envValue && /^\d+$/.test(envValue) ? envValue : undefined;
+}
+
 // Add these type definitions near the top with other types
 interface Person {
     id: string;
@@ -1517,10 +1527,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (current_company) formData.append('person[company]', current_company);
         if (location) formData.append('person[location]', location);
 
-        // Read at call time (not module-load time) so vi.stubEnv works in tests and
-        // so the value reflects runtime config changes. Validated inline with regex.
-        const envDefaultOwnerId = process.env.LOXO_DEFAULT_OWNER_ID;
-        const resolvedOwnerId = owned_by_id ?? (/^\d+$/.test(envDefaultOwnerId ?? '') ? envDefaultOwnerId : undefined);
+        const resolvedOwnerId = resolveOwnerId(owned_by_id);
         if (resolvedOwnerId) {
           formData.append('person[owned_by_id]', resolvedOwnerId);
         }
