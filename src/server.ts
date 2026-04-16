@@ -367,7 +367,7 @@ const PersonEventSchema = z.object({
 
 const GetCandidateActivitiesSchema = z.object({
   person_id: z.string().regex(/^\d+$/, "person_id must be numeric"),
-  per_page: z.number().int().positive().optional(),
+  per_page: z.coerce.number().int().positive().optional(),
   scroll_id: z.string().optional(),
   response_format: z.enum(['json', 'markdown']).optional(),
   activity_type_ids: z

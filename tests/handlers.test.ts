@@ -263,6 +263,7 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('rejects non-numeric activity_type_ids element', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_get_candidate_activities', {
         person_id: '42',
         activity_type_ids: ['abc'],
@@ -271,6 +272,7 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('rejects empty activity_type_ids array', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_get_candidate_activities', {
         person_id: '42',
         activity_type_ids: [],
@@ -351,6 +353,7 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('returns error when required name is missing', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_create_candidate', {
         email: 'no-name@example.com',
       });
@@ -406,6 +409,7 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('rejects non-numeric owned_by_id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_create_candidate', {
         name: 'TEST - Jane',
         owned_by_id: 'abc',
@@ -467,6 +471,7 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('returns error when only id is provided (empty body guard)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_update_candidate', { id: '42' });
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('No fields provided to update');
@@ -527,6 +532,7 @@ describe('Loxo MCP tool handlers', () => {
     });
 
     it('rejects non-numeric owned_by_id on update', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
       const result = await callTool(client, 'loxo_update_candidate', {
         id: '42',
         owned_by_id: 'abc',
