@@ -16,7 +16,7 @@ const envSchema = z.object({
     .string()
     .regex(
       /^\d+$/,
-      'LOXO_DEFAULT_OWNER_ID must be a numeric user ID — use loxo_get_users to find yours'
+      'LOXO_DEFAULT_OWNER_ID must be a numeric user ID — use loxo_list_users to find yours'
     )
     .optional(),
 });
