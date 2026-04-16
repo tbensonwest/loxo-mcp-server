@@ -473,6 +473,23 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.isError).toBeFalsy();
       expect(capturedBody).not.toContain('owned_by_id');
     });
+
+    it('coerces numeric owned_by_id to string before sending', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 99, name: 'TEST - Jane' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_candidate', {
+        name: 'TEST - Jane',
+        owned_by_id: 99 as unknown as string,
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bowned_by_id%5D=99');
+    });
   });
 
   // ─── loxo_update_candidate ────────────────────────────────────────────────

@@ -367,12 +367,12 @@ const PersonEventSchema = z.object({
 });
 
 const GetCandidateActivitiesSchema = z.object({
-  person_id: z.string().regex(/^\d+$/, "person_id must be numeric"),
+  person_id: z.coerce.string().regex(/^\d+$/, "person_id must be numeric"),
   per_page: z.coerce.number().int().positive().optional(),
   scroll_id: z.string().optional(),
   response_format: z.enum(['json', 'markdown']).optional(),
   activity_type_ids: z
-    .array(z.string().regex(/^\d+$/, "activity_type_ids[] must all be numeric"))
+    .array(z.coerce.string().regex(/^\d+$/, "activity_type_ids[] must all be numeric"))
     .nonempty("activity_type_ids cannot be an empty array")
     .optional()
     .describe("Filter to only these activity types. Use loxo_get_activity_types to discover IDs."),
@@ -437,7 +437,7 @@ const CreateCandidateSchema = z.object({
   current_title: z.string().optional().describe("Current job title."),
   current_company: z.string().optional().describe("Current employer name."),
   location: z.string().optional().describe("City, region, or country."),
-  owned_by_id: z.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
+  owned_by_id: z.coerce.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
 });
 
 const UpdateCandidateSchema = z.object({
@@ -453,7 +453,7 @@ const UpdateCandidateSchema = z.object({
   sector_ids: z.array(z.number().int()).optional().describe("Sector hierarchy IDs. Use loxo_list_skillsets to discover IDs. E.g. [5690364] for Financial Services."),
   person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
   source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
-  owned_by_id: z.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
+  owned_by_id: z.coerce.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
 });
 
 const AddToPipelineSchema = z.object({
