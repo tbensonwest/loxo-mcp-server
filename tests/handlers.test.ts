@@ -47,6 +47,41 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.isError).toBeFalsy();
       expect(result.content[0].text).toContain('Call');
     });
+
+    it('appends workflow_id as query param when provided', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify([{ id: 100, name: 'Deal Won' }])),
+        });
+      }));
+      const result = await callTool(client, 'loxo_get_activity_types', { workflow_id: '54622' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('workflow_id=54622');
+      expect(result.content[0].text).toContain('Deal Won');
+    });
+
+    it('omits workflow_id when not provided (backward compat)', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify([{ id: 1, name: 'Call' }])),
+        });
+      }));
+      const result = await callTool(client, 'loxo_get_activity_types', {});
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).not.toContain('workflow_id');
+    });
+
+    it('rejects non-numeric workflow_id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_get_activity_types', { workflow_id: 'abc' });
+      expect(result.isError).toBe(true);
+    });
   });
 
   // ─── loxo_search_candidates ───────────────────────────────────────────────

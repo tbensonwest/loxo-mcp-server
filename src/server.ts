@@ -537,7 +537,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "loxo_get_activity_types",
-        description: "Get a list of all available activity types in Loxo (e.g., calls, meetings, interviews). Use this before scheduling or logging activities to find the correct activity_type_id. Example: Call this first to get activity type IDs, then use loxo_schedule_activity with the correct ID.",
+        description: "Get a list of all available activity types in Loxo (e.g., calls, meetings, interviews). Use this before scheduling or logging activities to find the correct activity_type_id. Pass a deal workflow_id to get deal-specific activity types (e.g. 'Deal Won', 'New Lead') instead of candidate activity types. Example: Call loxo_list_deal_workflows to get the workflow ID, then pass it here.",
         inputSchema: {
           type: "object",
           properties: {
@@ -545,6 +545,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               enum: ["json", "markdown"],
               description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            },
+            workflow_id: {
+              type: "string",
+              description: "Optional: Filter by workflow ID. Pass a deal workflow ID to get deal-specific activity types instead of candidate activity types. Use loxo_list_deal_workflows to find workflow IDs."
             }
           },
           required: [],
@@ -1174,8 +1178,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "loxo_get_activity_types": {
-        const { response_format = 'json' } = args as any;
-        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/activity_types`);
+        const { response_format = 'json', workflow_id } = args as any;
+        let endpoint = `/${env.LOXO_AGENCY_SLUG}/activity_types`;
+        if (workflow_id) {
+          requireNumericId(workflow_id, 'workflow_id');
+          endpoint += `?workflow_id=${workflow_id}`;
+        }
+        const response = await makeRequest(endpoint);
         const formatted = formatResponse(response, response_format as 'json' | 'markdown');
         const { text } = truncateResponse(formatted);
         return {
