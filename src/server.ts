@@ -62,6 +62,11 @@ function resolveOwnerId(explicitArg: string | undefined): string | undefined {
   return envValue && /^\d+$/.test(envValue) ? envValue : undefined;
 }
 
+function resolveOwnerEmail(explicitArg: string | undefined): string | undefined {
+  if (explicitArg) return explicitArg;
+  return process.env.LOXO_DEFAULT_OWNER_EMAIL || undefined;
+}
+
 // Add these type definitions near the top with other types
 interface Person {
     id: string;

@@ -364,6 +364,31 @@ describe('Loxo MCP tool handlers', () => {
     });
   });
 
+  // ─── resolveOwnerEmail (via loxo_create_deal) ───────────────────────────────
+
+  describe('resolveOwnerEmail', () => {
+    it('falls back to LOXO_DEFAULT_OWNER_EMAIL env var', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_EMAIL', 'heather@example.com');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ deal: { id: 1, name: 'TEST - Deal' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_deal', {
+        name: 'TEST - Deal',
+        amount: 10000,
+        closes_at: '2026-06-01',
+        workflow_id: '54622',
+        pipeline_stage_id: '100',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('deal%5Bowner_email%5D=heather%40example.com');
+    });
+  });
+
   // ─── loxo_create_candidate ────────────────────────────────────────────────
 
   describe('loxo_create_candidate', () => {
