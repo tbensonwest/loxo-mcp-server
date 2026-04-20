@@ -892,4 +892,112 @@ describe('Loxo MCP tool handlers', () => {
       expect(tool.description).toContain('loxo_get_candidate_brief');
     });
   });
+
+  // ─── loxo_list_deal_workflows ───────────────────────────────────────────
+
+  describe('loxo_list_deal_workflows', () => {
+    it('returns array of deal workflows', async () => {
+      mockFetch([
+        { id: 54622, name: 'Job Leads Pipeline' },
+        { id: 70404, name: 'Prospect Client Pipeline' },
+      ]);
+      const result = await callTool(client, 'loxo_list_deal_workflows', {});
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Job Leads Pipeline');
+      expect(result.content[0].text).toContain('70404');
+    });
+  });
+
+  // ─── loxo_get_deal_workflow ─────────────────────────────────────────────
+
+  describe('loxo_get_deal_workflow', () => {
+    it('returns workflow with pipeline stages', async () => {
+      mockFetch({
+        id: 54622,
+        name: 'Job Leads Pipeline',
+        pipeline_stages: [
+          { id: 100, name: 'New Lead' },
+          { id: 101, name: 'Contacted' },
+        ],
+      });
+      const result = await callTool(client, 'loxo_get_deal_workflow', { id: '54622' });
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Job Leads Pipeline');
+      expect(result.content[0].text).toContain('New Lead');
+    });
+
+    it('rejects non-numeric id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_get_deal_workflow', { id: 'abc' });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  // ─── loxo_search_deals ──────────────────────────────────────────────────
+
+  describe('loxo_search_deals', () => {
+    it('returns deals with pagination structure', async () => {
+      mockFetch({
+        deals: [{ id: 1, name: 'Acme Corp Deal', amount: 5000 }],
+        total_count: 1,
+        scroll_id: null,
+      });
+      const result = await callTool(client, 'loxo_search_deals', { query: 'Acme' });
+      expect(result.isError).toBeFalsy();
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.results).toHaveLength(1);
+      expect(parsed.results[0].name).toBe('Acme Corp Deal');
+      expect(parsed.pagination.total_count).toBe(1);
+      expect(parsed.pagination.has_more).toBe(false);
+    });
+
+    it('forwards owner_emails as repeated query params', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ deals: [], total_count: 0, scroll_id: null })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_search_deals', {
+        owner_emails: ['alice@example.com', 'bob@example.com'],
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('owner_emails%5B%5D=alice%40example.com');
+      expect(capturedUrl).toContain('owner_emails%5B%5D=bob%40example.com');
+    });
+
+    it('forwards query as query param', async () => {
+      let capturedUrl = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+        capturedUrl = url;
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ deals: [], total_count: 0, scroll_id: null })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_search_deals', { query: 'test deal' });
+      expect(result.isError).toBeFalsy();
+      expect(capturedUrl).toContain('query=test+deal');
+    });
+  });
+
+  // ─── loxo_get_deal ──────────────────────────────────────────────────────
+
+  describe('loxo_get_deal', () => {
+    it('returns deal object on success', async () => {
+      mockFetch({ id: 42, name: 'Acme Corp Deal', amount: 15000, closes_at: '2026-06-01' });
+      const result = await callTool(client, 'loxo_get_deal', { id: '42' });
+      expect(result.isError).toBeFalsy();
+      expect(result.content[0].text).toContain('Acme Corp Deal');
+      expect(result.content[0].text).toContain('15000');
+    });
+
+    it('rejects non-numeric id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_get_deal', { id: 'abc' });
+      expect(result.isError).toBe(true);
+    });
+  });
 });

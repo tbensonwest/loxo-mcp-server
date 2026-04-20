@@ -473,6 +473,27 @@ const UploadResumeSchema = z.object({
   file_content_base64: z.string().describe("Base64-encoded file content."),
 });
 
+const ListDealWorkflowsSchema = z.object({
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const GetDealWorkflowSchema = z.object({
+  id: z.coerce.string().regex(/^\d+$/, "id must be numeric").describe("Deal workflow ID"),
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const SearchDealsSchema = z.object({
+  query: z.string().optional().describe("Lucene query string"),
+  owner_emails: z.array(z.string().email()).optional().describe("Filter by owner email addresses"),
+  scroll_id: z.string().optional().describe("Pagination cursor from previous search"),
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const GetDealSchema = z.object({
+  id: z.coerce.string().regex(/^\d+$/, "id must be numeric").describe("Deal ID"),
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
 type SearchArgs = z.infer<typeof SearchSchema>; // Generic search, might deprecate if specific ones cover all uses
 type TypeSearchCandidatesArgs = z.infer<typeof SearchCandidatesSchema>;
@@ -1167,6 +1188,111 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: { type: "object", properties: {}, required: [] },
       },
+      {
+        name: "loxo_list_deal_workflows",
+        description: "List all deal workflows (pipelines) with their IDs and names. Use the returned workflow ID with loxo_get_deal_workflow to see pipeline stages, or pass it to loxo_get_activity_types to get deal-specific activity types.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: [],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_get_deal_workflow",
+        description: "Get a single deal workflow including its pipeline stages. Use the returned pipeline_stage_id values when creating deals with loxo_create_deal.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Deal workflow ID"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: ["id"],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_search_deals",
+        description: "Search and list deals with optional Lucene query, owner email filter, and cursor-based pagination. Returns deals with pagination metadata. Use loxo_list_deal_workflows first to understand which pipelines exist.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Lucene query string (optional)"
+            },
+            owner_emails: {
+              type: "array",
+              items: { type: "string" },
+              description: "Filter by owner email addresses (optional)"
+            },
+            scroll_id: {
+              type: "string",
+              description: "Pagination cursor from previous search results"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: [],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_get_deal",
+        description: "Get full details of a single deal by ID, including name, amount, close date, pipeline stage, and linked company/person/job.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Deal ID"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: ["id"],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
     ]
   };
 });
@@ -1822,6 +1948,70 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         );
         return {
           content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_deal_workflows": {
+        const { response_format = 'json' } = ListDealWorkflowsSchema.parse(args);
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/deal_workflows`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return {
+          content: [{ type: "text", text }]
+        };
+      }
+
+      case "loxo_get_deal_workflow": {
+        const { id, response_format = 'json' } = GetDealWorkflowSchema.parse(args);
+        requireNumericId(id, 'id');
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/deal_workflows/${id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return {
+          content: [{ type: "text", text }]
+        };
+      }
+
+      case "loxo_search_deals": {
+        const { query, owner_emails, scroll_id, response_format = 'json' } = SearchDealsSchema.parse(args);
+
+        const searchParams = new URLSearchParams();
+        if (query) searchParams.append('query', query);
+        if (scroll_id) searchParams.append('scroll_id', scroll_id);
+        if (owner_emails) {
+          for (const email of owner_emails) {
+            searchParams.append('owner_emails[]', email);
+          }
+        }
+
+        const apiResponse: any = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/deals?${searchParams.toString()}`
+        );
+
+        const deals = apiResponse?.deals || apiResponse || [];
+        const toolResponse = {
+          results: Array.isArray(deals) ? deals : [],
+          pagination: {
+            scroll_id: apiResponse?.scroll_id || null,
+            has_more: !!(apiResponse?.scroll_id),
+            total_count: apiResponse?.total_count || 0,
+            returned_count: Array.isArray(deals) ? deals.length : 0,
+          },
+        };
+
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return { content: [{ type: "text", text }] };
+      }
+
+      case "loxo_get_deal": {
+        const { id, response_format = 'json' } = GetDealSchema.parse(args);
+        requireNumericId(id, 'id');
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/deals/${id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return {
+          content: [{ type: "text", text }]
         };
       }
 
