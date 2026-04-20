@@ -5,7 +5,7 @@
 
 **📚 Documentation:** https://tbensonwest.github.io/loxo-mcp-server/
 
-A Model Context Protocol (MCP) server that gives Claude direct access to the Loxo recruitment platform. Version 1.6.0 provides 28 tools covering the full recruiter workflow: searching and researching candidates, managing job pipelines, tracking activity and communication, working with companies, and maintaining candidate records. Tool descriptions guide Claude to surface recruiter intake notes and intel-rich activity history — so it can answer "where did we leave things with this candidate?" without you having to dig.
+A Model Context Protocol (MCP) server that gives Claude direct access to the Loxo recruitment platform. Version 1.7.0 provides 34 tools covering the full recruiter workflow: searching and researching candidates, managing job pipelines, tracking activity and communication, working with companies, and maintaining candidate records. Tool descriptions guide Claude to surface recruiter intake notes and intel-rich activity history — so it can answer "where did we leave things with this candidate?" without you having to dig.
 
 <a href="https://glama.ai/mcp/servers/rj00ooup46"><img width="380" height="200" src="https://glama.ai/mcp/servers/rj00ooup46/badge" alt="Loxo Server MCP server" /></a>
 
@@ -70,6 +70,7 @@ Required environment variables:
 - `LOXO_AGENCY_SLUG`: Your agency's slug in Loxo
 - `LOXO_DOMAIN`: (Optional) Defaults to 'app.loxo.co'
 - `LOXO_DEFAULT_OWNER_ID`: (Optional) Default Loxo user ID to set as `owned_by_id` on candidates created or updated via this server. Find your ID via `loxo_list_users`. Falls back to no owner if not set; overridden per-call by the `owned_by_id` arg.
+- `LOXO_DEFAULT_OWNER_EMAIL`: (Optional) Default email for deal ownership. Used by `loxo_create_deal` when no `owner_email` arg is provided. Find emails via `loxo_list_users`.
 
 ### Docker Configuration
 
@@ -207,13 +208,22 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 - **`loxo_get_job_pipeline`** — All candidates currently on a job with their pipeline stage (sourced, screened, interviewing, offer, placed). Returns candidate IDs and stages; follow up with `loxo_get_candidate_brief` for full context on each person.
 - **`loxo_add_to_pipeline`** — Add a candidate to a job's pipeline. Places them at the first stage and makes them visible in `loxo_get_job_pipeline`.
 
+### Deals & BD Pipeline
+
+- **`loxo_list_deal_workflows`** — List all deal workflows (pipelines) with IDs and names. Use to discover which pipelines exist before searching or creating deals.
+- **`loxo_get_deal_workflow`** — Get a deal workflow's details including pipeline stages. Use to find valid `pipeline_stage_id` values for `loxo_create_deal`.
+- **`loxo_search_deals`** — Search deals with optional Lucene query and owner email filter. Uses cursor-based pagination with `scroll_id`.
+- **`loxo_get_deal`** — Full deal details including name, amount, close date, pipeline stage, and linked company/person/job.
+- **`loxo_create_deal`** — Create a new deal in a pipeline. Requires name, amount, close date, workflow ID, and pipeline stage ID. Owner email falls back to `LOXO_DEFAULT_OWNER_EMAIL`.
+- **`loxo_log_deal_activity`** — Log an activity on a deal. Use `loxo_get_activity_types` with the deal's `workflow_id` to find deal-specific activity type IDs.
+
 ### Track Activity & Communication
 
 - **`loxo_get_candidate_activities`** — Full activity timeline for a candidate: all calls, emails, meetings, notes, pipeline moves, and automation events, most recent first. Optionally filter by `activity_type_ids` (use `loxo_get_activity_types` to discover IDs). For a cleaner, intel-focused view, use `loxo_get_candidate_brief` instead.
 - **`loxo_log_activity`** — Record a completed activity (call, email, meeting, interview) against a candidate. Use `loxo_get_activity_types` first to find the correct activity type ID.
 - **`loxo_schedule_activity`** — Create a future activity (call, meeting, interview) for a candidate. Use `loxo_get_activity_types` first to find the correct activity type ID.
 - **`loxo_get_todays_tasks`** — All scheduled items for today (or a date range you specify). Optionally filter by user.
-- **`loxo_get_activity_types`** — List all activity types and their IDs. Call this before logging or scheduling activities to get the correct `activity_type_id`.
+- **`loxo_get_activity_types`** — List all activity types and their IDs. Optionally pass a `workflow_id` to get deal-specific activity types instead of candidate types. Call this before logging or scheduling activities.
 
 ### Companies & Reference Data
 
@@ -235,7 +245,7 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 
 Built on the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/sdk), communicating over stdio for seamless integration with Claude Desktop and Claude.ai.
 
-- **v1.6.0** — 28 tools; tool descriptions guide Claude to surface recruiter intake notes (`description` field) and intel-rich activities (calls, emails, notes, interviews) while filtering out pipeline automation noise
+- **v1.7.0** — 34 tools; tool descriptions guide Claude to surface recruiter intake notes (`description` field) and intel-rich activities (calls, emails, notes, interviews) while filtering out pipeline automation noise
 - All API calls go to `https://{LOXO_DOMAIN}/api/{LOXO_AGENCY_SLUG}/...` with Bearer token auth
 - POST/PATCH request bodies use `application/x-www-form-urlencoded` with bracket notation (e.g. `person[name]`)
 - All endpoints verified against the official Loxo OpenAPI specification
@@ -244,7 +254,7 @@ Built on the [Model Context Protocol SDK](https://github.com/modelcontextprotoco
 
 Two pagination styles are used depending on the endpoint:
 
-- **Cursor-based (`scroll_id`)** — used by candidates, companies, schedule items, and activities. Pass the `scroll_id` from one response to the next to walk through pages.
+- **Cursor-based (`scroll_id`)** — used by candidates, companies, deals, schedule items, and activities. Pass the `scroll_id` from one response to the next to walk through pages.
 - **Page-based (`page` / `per_page`)** — used by jobs. Pass `page=1`, `page=2`, etc.
 
 ### Activity & Event System
