@@ -1000,4 +1000,160 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.isError).toBe(true);
     });
   });
+
+  // ─── loxo_create_deal ───────────────────────────────────────────────────
+
+  describe('loxo_create_deal', () => {
+    it('POSTs form-encoded deal fields', async () => {
+      let capturedUrl = '';
+      let capturedMethod = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedMethod = opts?.method || 'GET';
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ deal: { id: 1, name: 'TEST - New Deal' } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_deal', {
+        name: 'TEST - New Deal',
+        amount: 25000,
+        closes_at: '2026-07-01',
+        workflow_id: '54622',
+        pipeline_stage_id: '100',
+        owner_email: 'heather@example.com',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedMethod).toBe('POST');
+      expect(capturedUrl).toContain('/test-agency/deals');
+      expect(capturedBody).toContain('deal%5Bname%5D=TEST+-+New+Deal');
+      expect(capturedBody).toContain('deal%5Bamount%5D=25000');
+      expect(capturedBody).toContain('deal%5Bcloses_at%5D=2026-07-01');
+      expect(capturedBody).toContain('deal%5Bworkflow_id%5D=54622');
+      expect(capturedBody).toContain('deal%5Bpipeline_stage_id%5D=100');
+      expect(capturedBody).toContain('deal%5Bowner_email%5D=heather%40example.com');
+    });
+
+    it('includes optional company_id, person_id, job_id when provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ deal: { id: 2 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_deal', {
+        name: 'TEST - Linked Deal',
+        amount: 10000,
+        closes_at: '2026-08-01',
+        workflow_id: '54622',
+        pipeline_stage_id: '100',
+        owner_email: 'heather@example.com',
+        company_id: '500',
+        person_id: '42',
+        job_id: '99',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('deal%5Bcompany_id%5D=500');
+      expect(capturedBody).toContain('deal%5Bperson_id%5D=42');
+      expect(capturedBody).toContain('deal%5Bjob_id%5D=99');
+    });
+
+    it('explicit owner_email overrides env', async () => {
+      vi.stubEnv('LOXO_DEFAULT_OWNER_EMAIL', 'env-default@example.com');
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ deal: { id: 3 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_create_deal', {
+        name: 'TEST - Override Deal',
+        amount: 5000,
+        closes_at: '2026-09-01',
+        workflow_id: '54622',
+        pipeline_stage_id: '100',
+        owner_email: 'explicit@example.com',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('deal%5Bowner_email%5D=explicit%40example.com');
+      expect(capturedBody).not.toContain('env-default%40example.com');
+    });
+
+    it('errors when neither owner_email arg nor env is set', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_deal', {
+        name: 'TEST - No Owner',
+        amount: 5000,
+        closes_at: '2026-09-01',
+        workflow_id: '54622',
+        pipeline_stage_id: '100',
+      });
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('owner_email');
+    });
+
+    it('rejects missing required field', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_create_deal', {
+        amount: 5000,
+        closes_at: '2026-09-01',
+        workflow_id: '54622',
+        pipeline_stage_id: '100',
+        owner_email: 'heather@example.com',
+      });
+      expect(result.isError).toBe(true);
+    });
+  });
+
+  // ─── loxo_log_deal_activity ─────────────────────────────────────────────
+
+  describe('loxo_log_deal_activity', () => {
+    it('POSTs activity_type_id and notes to deal events endpoint', async () => {
+      let capturedUrl = '';
+      let capturedMethod = '';
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts: any) => {
+        capturedUrl = url;
+        capturedMethod = opts?.method || 'GET';
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ event: { id: 1 } })),
+        });
+      }));
+      const result = await callTool(client, 'loxo_log_deal_activity', {
+        deal_id: '42',
+        activity_type_id: '1550104',
+        notes: 'Deal closed successfully',
+      });
+      expect(result.isError).toBeFalsy();
+      expect(capturedMethod).toBe('POST');
+      expect(capturedUrl).toContain('/test-agency/deals/42/events');
+      expect(capturedBody).toContain('activity_type_id=1550104');
+      expect(capturedBody).toContain('notes=Deal+closed+successfully');
+    });
+
+    it('rejects non-numeric deal_id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_log_deal_activity', {
+        deal_id: 'abc',
+        activity_type_id: '1550104',
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('rejects missing activity_type_id', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('fetch must not be called')));
+      const result = await callTool(client, 'loxo_log_deal_activity', {
+        deal_id: '42',
+      });
+      expect(result.isError).toBe(true);
+    });
+  });
 });
