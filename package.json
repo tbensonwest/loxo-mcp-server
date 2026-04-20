@@ -1,6 +1,7 @@
 {
   "name": "loxo-mcp-server",
   "version": "1.6.0",
+  "license": "MIT",
   "type": "module",
   "main": "build/index.js",
   "scripts": {
