@@ -19,6 +19,7 @@ const envSchema = z.object({
       'LOXO_DEFAULT_OWNER_ID must be a numeric user ID — use loxo_list_users to find yours'
     )
     .optional(),
+  LOXO_DEFAULT_OWNER_EMAIL: z.string().optional(),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

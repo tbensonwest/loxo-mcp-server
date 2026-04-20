@@ -62,6 +62,11 @@ function resolveOwnerId(explicitArg: string | undefined): string | undefined {
   return envValue && /^\d+$/.test(envValue) ? envValue : undefined;
 }
 
+function resolveOwnerEmail(explicitArg: string | undefined): string | undefined {
+  if (explicitArg) return explicitArg;
+  return process.env.LOXO_DEFAULT_OWNER_EMAIL || undefined;
+}
+
 // Add these type definitions near the top with other types
 interface Person {
     id: string;
@@ -468,6 +473,45 @@ const UploadResumeSchema = z.object({
   file_content_base64: z.string().describe("Base64-encoded file content."),
 });
 
+const ListDealWorkflowsSchema = z.object({
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const GetDealWorkflowSchema = z.object({
+  id: z.coerce.string().regex(/^\d+$/, "id must be numeric").describe("Deal workflow ID"),
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const SearchDealsSchema = z.object({
+  query: z.string().optional().describe("Lucene query string"),
+  owner_emails: z.array(z.string().email()).optional().describe("Filter by owner email addresses"),
+  scroll_id: z.string().optional().describe("Pagination cursor from previous search"),
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const GetDealSchema = z.object({
+  id: z.coerce.string().regex(/^\d+$/, "id must be numeric").describe("Deal ID"),
+  response_format: z.enum(['json', 'markdown']).optional(),
+});
+
+const CreateDealSchema = z.object({
+  name: z.string().trim().min(1, "name is required").describe("Deal name (required)"),
+  amount: z.number().describe("Deal value/amount (required)"),
+  closes_at: z.string().describe("Expected close date, ISO datetime (required)"),
+  workflow_id: z.coerce.string().regex(/^\d+$/, "workflow_id must be numeric").describe("Deal workflow/pipeline ID (required). Use loxo_list_deal_workflows to find."),
+  pipeline_stage_id: z.coerce.string().regex(/^\d+$/, "pipeline_stage_id must be numeric").describe("Initial pipeline stage ID (required). Use loxo_get_deal_workflow to find stage IDs."),
+  owner_email: z.string().email().optional().describe("Owner email. Falls back to LOXO_DEFAULT_OWNER_EMAIL env var."),
+  company_id: z.coerce.string().regex(/^\d+$/, "company_id must be numeric").optional().describe("Associated company ID"),
+  person_id: z.coerce.string().regex(/^\d+$/, "person_id must be numeric").optional().describe("Associated person/contact ID"),
+  job_id: z.coerce.string().regex(/^\d+$/, "job_id must be numeric").optional().describe("Associated job ID"),
+});
+
+const LogDealActivitySchema = z.object({
+  deal_id: z.coerce.string().regex(/^\d+$/, "deal_id must be numeric").describe("Deal ID"),
+  activity_type_id: z.coerce.string().regex(/^\d+$/, "activity_type_id must be numeric").describe("Activity type ID. Use loxo_get_activity_types with the deal's workflow_id to find valid IDs."),
+  notes: z.string().optional().describe("Optional notes for this activity"),
+});
+
 type PersonEventArgs = z.infer<typeof PersonEventSchema>;
 type SearchArgs = z.infer<typeof SearchSchema>; // Generic search, might deprecate if specific ones cover all uses
 type TypeSearchCandidatesArgs = z.infer<typeof SearchCandidatesSchema>;
@@ -532,7 +576,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "loxo_get_activity_types",
-        description: "Get a list of all available activity types in Loxo (e.g., calls, meetings, interviews). Use this before scheduling or logging activities to find the correct activity_type_id. Example: Call this first to get activity type IDs, then use loxo_schedule_activity with the correct ID.",
+        description: "Get a list of all available activity types in Loxo (e.g., calls, meetings, interviews). Use this before scheduling or logging activities to find the correct activity_type_id. Pass a deal workflow_id to get deal-specific activity types (e.g. 'Deal Won', 'New Lead') instead of candidate activity types. Example: Call loxo_list_deal_workflows to get the workflow ID, then pass it here.",
         inputSchema: {
           type: "object",
           properties: {
@@ -540,6 +584,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               enum: ["json", "markdown"],
               description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            },
+            workflow_id: {
+              type: "string",
+              description: "Optional: Filter by workflow ID. Pass a deal workflow ID to get deal-specific activity types instead of candidate activity types. Use loxo_list_deal_workflows to find workflow IDs."
             }
           },
           required: [],
@@ -1158,6 +1206,155 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
         inputSchema: { type: "object", properties: {}, required: [] },
       },
+      {
+        name: "loxo_list_deal_workflows",
+        description: "List all deal workflows (pipelines) with their IDs and names. Use the returned workflow ID with loxo_get_deal_workflow to see pipeline stages, or pass it to loxo_get_activity_types to get deal-specific activity types.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: [],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_get_deal_workflow",
+        description: "Get a single deal workflow including its pipeline stages. Use the returned pipeline_stage_id values when creating deals with loxo_create_deal.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Deal workflow ID"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: ["id"],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_search_deals",
+        description: "Search and list deals with optional Lucene query, owner email filter, and cursor-based pagination. Returns deals with pagination metadata. Use loxo_list_deal_workflows first to understand which pipelines exist.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Lucene query string (optional)"
+            },
+            owner_emails: {
+              type: "array",
+              items: { type: "string" },
+              description: "Filter by owner email addresses (optional)"
+            },
+            scroll_id: {
+              type: "string",
+              description: "Pagination cursor from previous search results"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: [],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_get_deal",
+        description: "Get full details of a single deal by ID, including name, amount, close date, pipeline stage, and linked company/person/job.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Deal ID"
+            },
+            response_format: {
+              type: "string",
+              enum: ["json", "markdown"],
+              description: "Response format: 'json' for structured data (default), 'markdown' for human-readable formatted text"
+            }
+          },
+          required: ["id"],
+        },
+        annotations: {
+          readOnlyHint: true,
+          destructiveHint: false,
+          idempotentHint: true,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_create_deal",
+        description: "Create a new deal in a pipeline. Requires name, amount, close date, workflow_id, and pipeline_stage_id. Use loxo_list_deal_workflows and loxo_get_deal_workflow to find valid workflow and stage IDs. Owner email falls back to LOXO_DEFAULT_OWNER_EMAIL env var if not provided. Optionally link to a company, person, or job.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Deal name (required)" },
+            amount: { type: "number", description: "Deal value/amount (required)" },
+            closes_at: { type: "string", description: "Expected close date, ISO datetime (required)" },
+            workflow_id: { type: "string", description: "Deal workflow/pipeline ID (required). Use loxo_list_deal_workflows to find." },
+            pipeline_stage_id: { type: "string", description: "Initial pipeline stage ID (required). Use loxo_get_deal_workflow to find stage IDs." },
+            owner_email: { type: "string", description: "Owner email. Falls back to LOXO_DEFAULT_OWNER_EMAIL env var." },
+            company_id: { type: "string", description: "Associated company ID (optional)" },
+            person_id: { type: "string", description: "Associated person/contact ID (optional)" },
+            job_id: { type: "string", description: "Associated job ID (optional)" },
+          },
+          required: ["name", "amount", "closes_at", "workflow_id", "pipeline_stage_id"],
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
+      {
+        name: "loxo_log_deal_activity",
+        description: "Log an activity or event on a deal (e.g. 'Deal Won', 'Meeting', 'Note'). Use loxo_get_activity_types with the deal's workflow_id to find valid activity_type_id values — deal activity types are different from candidate activity types.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            deal_id: { type: "string", description: "Deal ID" },
+            activity_type_id: { type: "string", description: "Activity type ID. Use loxo_get_activity_types with workflow_id to find valid IDs." },
+            notes: { type: "string", description: "Optional notes for this activity" },
+          },
+          required: ["deal_id", "activity_type_id"],
+        },
+        annotations: {
+          readOnlyHint: false,
+          destructiveHint: false,
+          idempotentHint: false,
+          openWorldHint: true,
+        },
+      },
     ]
   };
 });
@@ -1169,8 +1366,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     switch (name) {
       case "loxo_get_activity_types": {
-        const { response_format = 'json' } = args as any;
-        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/activity_types`);
+        const { response_format = 'json', workflow_id } = args as any;
+        let endpoint = `/${env.LOXO_AGENCY_SLUG}/activity_types`;
+        if (workflow_id) {
+          requireNumericId(workflow_id, 'workflow_id');
+          endpoint += `?workflow_id=${workflow_id}`;
+        }
+        const response = await makeRequest(endpoint);
         const formatted = formatResponse(response, response_format as 'json' | 'markdown');
         const { text } = truncateResponse(formatted);
         return {
@@ -1804,6 +2006,126 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             method: 'POST',
             body: formData,
             // Do NOT set Content-Type — fetch sets it automatically with boundary for FormData
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_list_deal_workflows": {
+        const { response_format = 'json' } = ListDealWorkflowsSchema.parse(args);
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/deal_workflows`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return {
+          content: [{ type: "text", text }]
+        };
+      }
+
+      case "loxo_get_deal_workflow": {
+        const { id, response_format = 'json' } = GetDealWorkflowSchema.parse(args);
+        requireNumericId(id, 'id');
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/deal_workflows/${id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return {
+          content: [{ type: "text", text }]
+        };
+      }
+
+      case "loxo_search_deals": {
+        const { query, owner_emails, scroll_id, response_format = 'json' } = SearchDealsSchema.parse(args);
+
+        const searchParams = new URLSearchParams();
+        if (query) searchParams.append('query', query);
+        if (scroll_id) searchParams.append('scroll_id', scroll_id);
+        if (owner_emails) {
+          for (const email of owner_emails) {
+            searchParams.append('owner_emails[]', email);
+          }
+        }
+
+        const apiResponse: any = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/deals?${searchParams.toString()}`
+        );
+
+        const deals = apiResponse?.deals || apiResponse || [];
+        const toolResponse = {
+          results: Array.isArray(deals) ? deals : [],
+          pagination: {
+            scroll_id: apiResponse?.scroll_id || null,
+            has_more: !!(apiResponse?.scroll_id),
+            total_count: apiResponse?.total_count || 0,
+            returned_count: Array.isArray(deals) ? deals.length : 0,
+          },
+        };
+
+        const formatted = formatResponse(toolResponse, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return { content: [{ type: "text", text }] };
+      }
+
+      case "loxo_get_deal": {
+        const { id, response_format = 'json' } = GetDealSchema.parse(args);
+        requireNumericId(id, 'id');
+        const response = await makeRequest(`/${env.LOXO_AGENCY_SLUG}/deals/${id}`);
+        const formatted = formatResponse(response, response_format as 'json' | 'markdown');
+        const { text } = truncateResponse(formatted);
+        return {
+          content: [{ type: "text", text }]
+        };
+      }
+
+      case "loxo_create_deal": {
+        const { name, amount, closes_at, workflow_id, pipeline_stage_id, owner_email, company_id, person_id, job_id } = CreateDealSchema.parse(args);
+
+        const resolvedEmail = resolveOwnerEmail(owner_email);
+        if (!resolvedEmail) {
+          return {
+            content: [{ type: "text", text: "owner_email is required but was not provided and LOXO_DEFAULT_OWNER_EMAIL is not set. Use loxo_list_users to find valid email addresses." }],
+            isError: true,
+          };
+        }
+
+        const formData = new URLSearchParams();
+        formData.append('deal[name]', name);
+        formData.append('deal[amount]', amount.toString());
+        formData.append('deal[closes_at]', closes_at);
+        formData.append('deal[workflow_id]', workflow_id);
+        formData.append('deal[pipeline_stage_id]', pipeline_stage_id);
+        formData.append('deal[owner_email]', resolvedEmail);
+        if (company_id) formData.append('deal[company_id]', company_id);
+        if (person_id) formData.append('deal[person_id]', person_id);
+        if (job_id) formData.append('deal[job_id]', job_id);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/deals`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+          }
+        );
+        return {
+          content: [{ type: "text", text: JSON.stringify(response, null, 2) }]
+        };
+      }
+
+      case "loxo_log_deal_activity": {
+        const { deal_id, activity_type_id, notes } = LogDealActivitySchema.parse(args);
+        requireNumericId(deal_id, 'deal_id');
+
+        const formData = new URLSearchParams();
+        formData.append('activity_type_id', activity_type_id);
+        if (notes) formData.append('notes', notes);
+
+        const response = await makeRequest(
+          `/${env.LOXO_AGENCY_SLUG}/deals/${deal_id}/events`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
           }
         );
         return {

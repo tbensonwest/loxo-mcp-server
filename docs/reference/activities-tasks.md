@@ -124,19 +124,30 @@ Claude calls `loxo_get_todays_tasks` with `start_date: "2026-03-23"` and `end_da
 
 List all activity types and their IDs. Call this before logging or scheduling activities so you use the correct activity type ID.
 
+By default (no `workflow_id`), this returns **candidate activity types** (e.g., Call, Email, Meeting, Interview, Note). To get **deal-specific activity types** (e.g., "Deal Won", "New Lead", "Terms Signed"), pass the deal's `workflow_id`. Deal activity types are separate from candidate activity types and must be looked up with the appropriate `workflow_id`.
+
 ### Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
+| `workflow_id` | string | No | Deal workflow ID. When provided, returns deal-specific activity types for that pipeline instead of candidate activity types. Get workflow IDs from `loxo_list_deal_workflows`. |
 | `response_format` | string | No | `"json"` or `"markdown"` |
 
-### Example
+### Example — candidate activity types
 
 > "What activity types are available in Loxo?"
 
-Claude calls `loxo_get_activity_types`, returning all available types (e.g., Call, Email, Meeting, Interview, Note) with their IDs. These IDs are required when logging or scheduling activities.
+Claude calls `loxo_get_activity_types`, returning all available candidate types (e.g., Call, Email, Meeting, Interview, Note) with their IDs. These IDs are required when logging or scheduling activities against candidates.
+
+### Example — deal activity types
+
+> "Log a 'Deal Won' activity on deal 99."
+
+Claude calls `loxo_list_deal_workflows` to find the relevant workflow ID, then calls `loxo_get_activity_types` with that `workflow_id` to retrieve deal-specific activity types. It then calls `loxo_log_deal_activity` with the correct `activity_type_id`.
 
 ### Related tools
 
-- [`loxo_log_activity`](/reference/activities-tasks#loxo_log_activity) -- use the activity type ID to log a completed activity
+- [`loxo_log_activity`](/reference/activities-tasks#loxo_log_activity) -- use the activity type ID to log a completed activity against a candidate
 - [`loxo_schedule_activity`](/reference/activities-tasks#loxo_schedule_activity) -- use the activity type ID to schedule a future activity
+- [`loxo_log_deal_activity`](/reference/deals#loxo_log_deal_activity) -- log an activity on a deal (use `workflow_id` to get deal-specific type IDs)
+- [`loxo_list_deal_workflows`](/reference/deals#loxo_list_deal_workflows) -- find the workflow ID needed for deal activity type lookup

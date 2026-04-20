@@ -66,6 +66,7 @@ LOXO_AGENCY_SLUG=your_agency_slug
 | `LOXO_AGENCY_SLUG` | Yes | — | Your agency's slug in Loxo |
 | `LOXO_DOMAIN` | No | `app.loxo.co` | Loxo API domain |
 | `LOXO_DEFAULT_OWNER_ID` | No | — | Default Loxo user ID to assign as record owner on candidates created or updated via this server. Overridden per-call by the `owned_by_id` arg. |
+| `LOXO_DEFAULT_OWNER_EMAIL` | No | — | Default email for deal ownership. Used by `loxo_create_deal` when no `owner_email` arg is provided. Find emails via `loxo_list_users`. |
 
 ### `LOXO_DEFAULT_OWNER_ID` (optional)
 
@@ -74,6 +75,14 @@ A numeric Loxo user ID (stored as a string). When set, every candidate created o
 **How to find your user ID:** ask Claude to run `loxo_list_users` and look up your name in the results.
 
 **If not set:** candidates are created without an owner, which is the existing behaviour.
+
+### `LOXO_DEFAULT_OWNER_EMAIL` (optional)
+
+The email address of the default deal owner. When set, `loxo_create_deal` uses this email to assign ownership unless the call explicitly passes an `owner_email` arg.
+
+**How to find your email:** ask Claude to run `loxo_list_users` and look up your name in the results.
+
+**If not set:** deals are created without a default owner email; you must pass `owner_email` on each `loxo_create_deal` call if ownership is required.
 
 ## Claude Desktop configuration
 

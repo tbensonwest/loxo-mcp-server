@@ -37,6 +37,7 @@ export default defineConfig({
         items: [
           { text: 'Candidates', link: '/reference/candidates' },
           { text: 'Jobs & Pipeline', link: '/reference/jobs-pipeline' },
+          { text: 'Deals & BD Pipeline', link: '/reference/deals' },
           { text: 'Activities & Tasks', link: '/reference/activities-tasks' },
           { text: 'Companies & Data', link: '/reference/companies-data' },
           { text: 'Candidate Management', link: '/reference/candidate-management' }
