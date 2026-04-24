@@ -20,11 +20,7 @@ const envSchema = z.object({
     )
     .optional(),
   LOXO_DEFAULT_OWNER_EMAIL: z.string().optional(),
-  LOXO_MCP_RESPONSE_LIMIT: z
-    .string()
-    .regex(/^\d+$/, 'LOXO_MCP_RESPONSE_LIMIT must be a number')
-    .transform(Number)
-    .default('250000'),
+  LOXO_MCP_RESPONSE_LIMIT: z.coerce.number().int().positive().default(250000),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
