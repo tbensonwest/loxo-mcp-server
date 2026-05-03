@@ -80,7 +80,7 @@ Log an activity on a deal.
 Set `LOXO_DEFAULT_OWNER_EMAIL` in your `.env` file to avoid passing `owner_email` on every `loxo_create_deal` call:
 
 ```env
-LOXO_DEFAULT_OWNER_EMAIL=heather@example.com
+LOXO_DEFAULT_OWNER_EMAIL=owner@example.com
 ```
 
 Find valid emails via `loxo_list_users`.
