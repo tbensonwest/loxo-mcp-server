@@ -7,3 +7,5 @@ docs/.vitepress/dist
 docs/.vitepress/cache
 .playwright-mcp
 .superpowers
+.claudedocs
+docs/superpowers

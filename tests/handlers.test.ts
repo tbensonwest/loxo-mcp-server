@@ -403,7 +403,7 @@ describe('Loxo MCP tool handlers', () => {
 
   describe('resolveOwnerEmail', () => {
     it('falls back to LOXO_DEFAULT_OWNER_EMAIL env var', async () => {
-      vi.stubEnv('LOXO_DEFAULT_OWNER_EMAIL', 'heather@example.com');
+      vi.stubEnv('LOXO_DEFAULT_OWNER_EMAIL', 'owner@example.com');
       let capturedBody = '';
       vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
         capturedBody = opts?.body || '';
@@ -420,7 +420,7 @@ describe('Loxo MCP tool handlers', () => {
         pipeline_stage_id: '100',
       });
       expect(result.isError).toBeFalsy();
-      expect(capturedBody).toContain('deal%5Bowner_email%5D=heather%40example.com');
+      expect(capturedBody).toContain('deal%5Bowner_email%5D=owner%40example.com');
     });
   });
 
@@ -1023,7 +1023,7 @@ describe('Loxo MCP tool handlers', () => {
         closes_at: '2026-07-01',
         workflow_id: '54622',
         pipeline_stage_id: '100',
-        owner_email: 'heather@example.com',
+        owner_email: 'owner@example.com',
       });
       expect(result.isError).toBeFalsy();
       expect(capturedMethod).toBe('POST');
@@ -1033,7 +1033,7 @@ describe('Loxo MCP tool handlers', () => {
       expect(capturedBody).toContain('deal%5Bcloses_at%5D=2026-07-01');
       expect(capturedBody).toContain('deal%5Bworkflow_id%5D=54622');
       expect(capturedBody).toContain('deal%5Bpipeline_stage_id%5D=100');
-      expect(capturedBody).toContain('deal%5Bowner_email%5D=heather%40example.com');
+      expect(capturedBody).toContain('deal%5Bowner_email%5D=owner%40example.com');
     });
 
     it('includes optional company_id, person_id, job_id when provided', async () => {
@@ -1051,7 +1051,7 @@ describe('Loxo MCP tool handlers', () => {
         closes_at: '2026-08-01',
         workflow_id: '54622',
         pipeline_stage_id: '100',
-        owner_email: 'heather@example.com',
+        owner_email: 'owner@example.com',
         company_id: '500',
         person_id: '42',
         job_id: '99',
@@ -1105,7 +1105,7 @@ describe('Loxo MCP tool handlers', () => {
         closes_at: '2026-09-01',
         workflow_id: '54622',
         pipeline_stage_id: '100',
-        owner_email: 'heather@example.com',
+        owner_email: 'owner@example.com',
       });
       expect(result.isError).toBe(true);
     });
