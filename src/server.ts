@@ -1104,8 +1104,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_update_candidate",
-        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling. Ownership can be set via owned_by_id (falls back to LOXO_DEFAULT_OWNER_ID env var).",
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, basic profile fields, compensation (salary, bonus, currency, salary_type), the description blob, and any other top-level person field via extra_fields. Tags are additive by default (does not remove existing); pass replace_tags=true for the destructive replace behaviour. Tags and skillsets require specific field formats: this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover IDs. Use the dynamic_fields discovery probe to enumerate the valid extra_fields keys for the tenant.",
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
