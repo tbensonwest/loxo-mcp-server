@@ -15,6 +15,10 @@ const LOXO_API_BASE = `https://${env.LOXO_DOMAIN}/api`;
 // Configurable response size limit (default 250K, override via LOXO_MCP_RESPONSE_LIMIT env var)
 const CHARACTER_LIMIT = env.LOXO_MCP_RESPONSE_LIMIT;
 
+// Fallback key validator for loxo_update_candidate's extra_fields, used when
+// the LOXO_PERSON_KEY_CACHE global is absent (e.g. offline tests).
+const SAFE_PERSON_FIELD_KEY = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
 // Helper function to truncate responses with clear messaging
 function truncateResponse(content: string, limit: number = CHARACTER_LIMIT): { text: string; wasTruncated: boolean } {
   if (content.length <= limit) {
@@ -459,6 +463,21 @@ const UpdateCandidateSchema = z.object({
   person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
   source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
   owned_by_id: z.coerce.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
+  replace_tags: z.boolean().optional().default(false).describe(
+    "When true, REPLACES existing tags with the provided array (uses person[all_raw_tags][]). When false (default), adds the provided tags additively (uses person[raw_tags][]) and leaves existing tags untouched."
+  ),
+  salary: z.number().optional().describe("Current salary, numeric (no currency symbol). Pair with compensation_currency_id."),
+  compensation: z.number().optional().describe("Total compensation including base + bonus + equity, numeric."),
+  compensation_currency_id: z.number().optional().describe("Currency ID. Use loxo_list_currencies to discover IDs."),
+  salary_type_id: z.number().optional().describe("Salary type ID (e.g. annual, hourly). Use loxo_list_salary_types to discover IDs."),
+  bonus: z.number().optional().describe("Bonus amount, numeric."),
+  description: z.string().optional().describe("The bio / recruiter notes blob. Free text. Replaces existing description."),
+  extra_fields: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))])
+  ).optional().describe(
+    "Map of {loxo_key: value} for any top-level person field not already covered by an explicit parameter (built-in or tenant-specific dynamic fields, all addressable via person[<key>]). Keys are validated against the dynamic_fields schema cached at server startup; with a cache miss they fall back to /^[a-zA-Z][a-zA-Z0-9_]*$/. Values may be string, number, or an array of strings/numbers (used for Hierarchy fields like skillset_ids that Loxo writes as person[<key>][] form entries, per Phase 0.3 verification)."
+  ),
 });
 
 const AddToPipelineSchema = z.object({
@@ -1089,8 +1108,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "loxo_update_candidate",
-        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, and basic profile fields. Tags and skillsets require specific field formats — this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover valid IDs before calling. Ownership can be set via owned_by_id (falls back to LOXO_DEFAULT_OWNER_ID env var).",
-        annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+        description: "Update an existing candidate's record in Loxo. Use to set tags, skillsets, sector, person type, source type, basic profile fields, compensation (salary, bonus, currency, salary_type), the description blob, and any other top-level person field via extra_fields. Tags are additive by default (does not remove existing); pass replace_tags=true for the destructive replace behaviour. Tags and skillsets require specific field formats: this tool handles the conversion automatically. Use loxo_list_skillsets and loxo_list_person_types to discover IDs. Use the dynamic_fields discovery probe to enumerate the valid extra_fields keys for the tenant.",
+        annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
         inputSchema: {
           type: "object",
           properties: {
@@ -1101,12 +1120,30 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
-            tags: { type: "array", items: { type: "string" }, description: "Tags to set. E.g. ['cv-import', 'debt-advisory']." },
+            tags: { type: "array", items: { type: "string" }, description: "Tags to add (additive by default, does not remove existing). Use replace_tags=true to set the full list explicitly. E.g. ['cv-import', 'debt-advisory']." },
+            replace_tags: { type: "boolean", description: "Default false (additive). Set to true to REPLACE existing tags with the provided array. Use with care: replace mode wipes any tags not in the input." },
             skillset_ids: { type: "array", items: { type: "number" }, description: "Skillset IDs from loxo_list_skillsets. E.g. [5704030] = Debt Advisory." },
             sector_ids: { type: "array", items: { type: "number" }, description: "Sector IDs from loxo_list_skillsets. E.g. [5690364] = Financial Services." },
             person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
             source_type_id: { type: "number", description: "Source type ID. 1206583=LinkedIn, 1206592=API." },
             owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var." },
+            salary: { type: "number", description: "Current salary, numeric (no currency symbol). Pair with compensation_currency_id." },
+            compensation: { type: "number", description: "Total compensation including base + bonus + equity, numeric." },
+            compensation_currency_id: { type: "number", description: "Currency ID. Use loxo_list_currencies to discover IDs." },
+            salary_type_id: { type: "number", description: "Salary type ID (e.g. annual, hourly). Use loxo_list_salary_types to discover IDs." },
+            bonus: { type: "number", description: "Bonus amount, numeric." },
+            description: { type: "string", description: "The bio / recruiter notes blob. Free text. Replaces existing description." },
+            extra_fields: {
+              type: "object",
+              description: "Map of Loxo person field keys (top-level on the person object) to values. Use to set fields not covered by explicit parameters. E.g. { \"expected_salary\": 95000, \"rejection_reason\": \"comp expectations\", \"skillset_ids\": [12, 34] }. Arrays are written as person[<key>][] form entries (used for Hierarchy fields like skillsets and sectors).",
+              additionalProperties: {
+                oneOf: [
+                  { type: "string" },
+                  { type: "number" },
+                  { type: "array", items: { type: ["string", "number"] } }
+                ]
+              }
+            },
           },
           required: ["id"],
         },
@@ -1785,7 +1822,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, replace_tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id, salary, compensation, compensation_currency_id, salary_type_id, bonus, description, extra_fields } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
@@ -1797,8 +1834,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (person_type_id) formData.append('person[person_type_id]', person_type_id.toString());
         if (source_type_id) formData.append('person[source_type_id]', source_type_id.toString());
         if (tags) {
+          const fieldName = replace_tags ? 'person[all_raw_tags][]' : 'person[raw_tags][]';
           for (const tag of tags) {
-            formData.append('person[all_raw_tags][]', tag);
+            formData.append(fieldName, tag);
           }
         }
         if (skillset_ids) {
@@ -1809,6 +1847,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (sector_ids) {
           for (const sid of sector_ids) {
             formData.append('person[custom_hierarchy_2][]', sid.toString());
+          }
+        }
+
+        if (salary !== undefined) formData.append('person[salary]', salary.toString());
+        if (compensation !== undefined) formData.append('person[compensation]', compensation.toString());
+        if (compensation_currency_id !== undefined) formData.append('person[compensation_currency_id]', compensation_currency_id.toString());
+        if (salary_type_id !== undefined) formData.append('person[salary_type_id]', salary_type_id.toString());
+        if (bonus !== undefined) formData.append('person[bonus]', bonus.toString());
+        if (description !== undefined) formData.append('person[description]', description);
+
+        if (extra_fields) {
+          // Optional schema-cache check. If the server has loaded /dynamic_fields at
+          // startup, prefer membership in the cached Person key set; otherwise fall
+          // back to the SAFE_PERSON_FIELD_KEY regex. Built-in keys (salary,
+          // compensation, etc.) appear in /dynamic_fields with built_in: true so
+          // the cache covers both kinds.
+          const personKeyCache: Set<string> | null = globalThis.LOXO_PERSON_KEY_CACHE ?? null;
+          for (const [key, value] of Object.entries(extra_fields)) {
+            const allowed = personKeyCache ? personKeyCache.has(key) : SAFE_PERSON_FIELD_KEY.test(key);
+            if (!allowed) {
+              return {
+                content: [{ type: "text", text: `Invalid extra_fields key: ${key}. Not in cached Person dynamic_fields schema and does not match safe-key pattern.` }],
+                isError: true,
+              };
+            }
+            if (Array.isArray(value)) {
+              // Hierarchy fields (skillset_ids, sector_ids, custom_hierarchy_*) come
+              // back from Loxo as arrays per Phase 0.3 verification, so they must be
+              // written via person[<key>][] form entries (one append per element).
+              // value.toString() on an array would join with commas, which Loxo treats
+              // as a single string and silently drops.
+              for (const v of value) formData.append(`person[${key}][]`, v.toString());
+            } else {
+              formData.append(`person[${key}]`, value.toString());
+            }
           }
         }
 

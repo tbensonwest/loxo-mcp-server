@@ -572,13 +572,14 @@ describe('Loxo MCP tool handlers', () => {
         id: '42',
         current_title: 'Senior Analyst',
         tags: ['debt-advisory', 'sourced'],
+        replace_tags: true,
         skillset_ids: [5704030],
         person_type_id: 80073,
         source_type_id: 1206583,
       });
       expect(result.isError).toBeFalsy();
       expect(capturedMethod).toBe('PUT');
-      // Tags must use array notation person[all_raw_tags][]=x
+      // Tags must use array notation person[all_raw_tags][]=x when replace_tags=true
       expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=debt-advisory');
       expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=sourced');
       // Skillsets use custom_hierarchy_1
@@ -587,6 +588,53 @@ describe('Loxo MCP tool handlers', () => {
       expect(capturedBody).toContain('person%5Bperson_type_id%5D=80073');
       // Source type
       expect(capturedBody).toContain('person%5Bsource_type_id%5D=1206583');
+    });
+
+    it('sends PUT with person[raw_tags][] (additive) by default, NOT person[all_raw_tags][]', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 42, name: 'Jane Smith', all_raw_tags: 'existing-tag, debt-advisory' }
+          })),
+        });
+      }));
+
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        tags: ['debt-advisory', 'new-tag'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      // Default is additive: raw_tags[], NOT all_raw_tags[]
+      expect(capturedBody).toContain('person%5Braw_tags%5D%5B%5D=debt-advisory');
+      expect(capturedBody).toContain('person%5Braw_tags%5D%5B%5D=new-tag');
+      expect(capturedBody).not.toContain('person%5Ball_raw_tags%5D%5B%5D');
+    });
+
+    it('sends PUT with person[all_raw_tags][] (replace) when replace_tags=true', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 42, name: 'Jane Smith', all_raw_tags: 'replaced-tag' }
+          })),
+        });
+      }));
+
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        tags: ['replaced-tag'],
+        replace_tags: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=replaced-tag');
+      expect(capturedBody).not.toContain('person%5Braw_tags%5D%5B%5D');
     });
 
     it('returns error when only id is provided (empty body guard)', async () => {
@@ -692,6 +740,132 @@ describe('Loxo MCP tool handlers', () => {
       });
       expect(result.isError).toBeFalsy();
       expect(capturedBody).not.toContain('owned_by_id');
+    });
+
+    it('sends PUT with compensation fields when provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        salary: 95000,
+        compensation: 110000,
+        compensation_currency_id: 1,
+        salary_type_id: 2,
+        bonus: 15000,
+        description: 'Strong candidate from referral, looking to move within 3 months.',
+      });
+
+      expect(capturedBody).toContain('person%5Bsalary%5D=95000');
+      expect(capturedBody).toContain('person%5Bcompensation%5D=110000');
+      expect(capturedBody).toContain('person%5Bcompensation_currency_id%5D=1');
+      expect(capturedBody).toContain('person%5Bsalary_type_id%5D=2');
+      expect(capturedBody).toContain('person%5Bbonus%5D=15000');
+      expect(capturedBody).toContain('person%5Bdescription%5D=Strong+candidate');
+    });
+
+    it('sends PUT with person[<key>] entries when extra_fields map is provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: {
+          expected_salary: 95000,
+          rejection_reason: 'comp expectations too high',
+        },
+      });
+
+      // Plain person[<key>], no $-prefix, per Phase 0.3 verification.
+      expect(capturedBody).toContain('person%5Bexpected_salary%5D=95000');
+      expect(capturedBody).toContain('person%5Brejection_reason%5D=comp+expectations+too+high');
+    });
+
+    it('rejects extra_fields keys that contain unsafe characters', async () => {
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: {
+          'bad key with spaces': 'value',
+        },
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('writes array extra_fields values as person[<key>][] form entries', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      // Hierarchy fields (skillset_ids, sector_ids, custom_hierarchy_*) come back
+      // from Loxo as arrays per Phase 0.3 verification, and must be written via
+      // person[<key>][] entries (one per element), not joined into a string.
+      await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: {
+          skillset_ids: [12, 34],
+        },
+      });
+
+      expect(capturedBody).toContain('person%5Bskillset_ids%5D%5B%5D=12');
+      expect(capturedBody).toContain('person%5Bskillset_ids%5D%5B%5D=34');
+      // Crucially, NOT a comma-joined single value:
+      expect(capturedBody).not.toContain('person%5Bskillset_ids%5D=12%2C34');
+    });
+
+    it('allows extra_fields keys present in LOXO_PERSON_KEY_CACHE even when they would fail the safe-key regex', async () => {
+      // When the cache is populated (loaded by a future PR from /dynamic_fields),
+      // it is the source of truth and trumps the SAFE_KEY regex fallback.
+      vi.stubGlobal('LOXO_PERSON_KEY_CACHE', new Set(['custom_hierarchy_1', 'fee-percentage']));
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      // 'fee-percentage' fails the SAFE_KEY regex (hyphens not allowed) but is in
+      // the cache, so the handler should accept and forward it.
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: { 'fee-percentage': 25 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bfee-percentage%5D=25');
+    });
+
+    it('rejects extra_fields keys not present in LOXO_PERSON_KEY_CACHE (strict allowlist when cache is loaded)', async () => {
+      // Inverse of the test above: when the cache is populated, the regex
+      // fallback is bypassed, so a regex-safe key that is not in the cache
+      // is still rejected. This guards against typoed keys reaching Loxo.
+      vi.stubGlobal('LOXO_PERSON_KEY_CACHE', new Set(['expected_salary']));
+
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        // 'unknown_field' matches the SAFE_KEY regex but is not in the cache.
+        extra_fields: { unknown_field: 'value' },
+      });
+
+      expect(result.isError).toBe(true);
     });
   });
 
