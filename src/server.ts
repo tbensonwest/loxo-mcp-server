@@ -15,6 +15,10 @@ const LOXO_API_BASE = `https://${env.LOXO_DOMAIN}/api`;
 // Configurable response size limit (default 250K, override via LOXO_MCP_RESPONSE_LIMIT env var)
 const CHARACTER_LIMIT = env.LOXO_MCP_RESPONSE_LIMIT;
 
+// Fallback key validator for loxo_update_candidate's extra_fields, used when
+// the LOXO_PERSON_KEY_CACHE global is absent (e.g. offline tests).
+const SAFE_PERSON_FIELD_KEY = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+
 // Helper function to truncate responses with clear messaging
 function truncateResponse(content: string, limit: number = CHARACTER_LIMIT): { text: string; wasTruncated: boolean } {
   if (content.length <= limit) {
@@ -1854,14 +1858,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (description !== undefined) formData.append('person[description]', description);
 
         if (extra_fields) {
-          const SAFE_KEY = /^[a-zA-Z][a-zA-Z0-9_]*$/;
           // Optional schema-cache check. If the server has loaded /dynamic_fields at
           // startup, prefer membership in the cached Person key set; otherwise fall
-          // back to the regex. Built-in keys (salary, compensation, etc.) appear in
-          // /dynamic_fields with built_in: true so the cache covers both kinds.
+          // back to the SAFE_PERSON_FIELD_KEY regex. Built-in keys (salary,
+          // compensation, etc.) appear in /dynamic_fields with built_in: true so
+          // the cache covers both kinds.
           const personKeyCache: Set<string> | null = globalThis.LOXO_PERSON_KEY_CACHE ?? null;
           for (const [key, value] of Object.entries(extra_fields)) {
-            const allowed = personKeyCache ? personKeyCache.has(key) : SAFE_KEY.test(key);
+            const allowed = personKeyCache ? personKeyCache.has(key) : SAFE_PERSON_FIELD_KEY.test(key);
             if (!allowed) {
               return {
                 content: [{ type: "text", text: `Invalid extra_fields key: ${key}. Not in cached Person dynamic_fields schema and does not match safe-key pattern.` }],
