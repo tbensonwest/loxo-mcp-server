@@ -769,6 +769,65 @@ describe('Loxo MCP tool handlers', () => {
       expect(capturedBody).toContain('person%5Bbonus%5D=15000');
       expect(capturedBody).toContain('person%5Bdescription%5D=Strong+candidate');
     });
+
+    it('sends PUT with person[<key>] entries when extra_fields map is provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: {
+          expected_salary: 95000,
+          rejection_reason: 'comp expectations too high',
+        },
+      });
+
+      // Plain person[<key>], no $-prefix, per Phase 0.3 verification.
+      expect(capturedBody).toContain('person%5Bexpected_salary%5D=95000');
+      expect(capturedBody).toContain('person%5Brejection_reason%5D=comp+expectations+too+high');
+    });
+
+    it('rejects extra_fields keys that contain unsafe characters', async () => {
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: {
+          'bad key with spaces': 'value',
+        },
+      });
+      expect(result.isError).toBe(true);
+    });
+
+    it('writes array extra_fields values as person[<key>][] form entries', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      // Hierarchy fields (skillset_ids, sector_ids, custom_hierarchy_*) come back
+      // from Loxo as arrays per Phase 0.3 verification, and must be written via
+      // person[<key>][] entries (one per element), not joined into a string.
+      await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: {
+          skillset_ids: [12, 34],
+        },
+      });
+
+      expect(capturedBody).toContain('person%5Bskillset_ids%5D%5B%5D=12');
+      expect(capturedBody).toContain('person%5Bskillset_ids%5D%5B%5D=34');
+      // Crucially, NOT a comma-joined single value:
+      expect(capturedBody).not.toContain('person%5Bskillset_ids%5D=12%2C34');
+    });
   });
 
   // ─── loxo_apply_to_job ────────────────────────────────────────────────────

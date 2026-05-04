@@ -468,6 +468,12 @@ const UpdateCandidateSchema = z.object({
   salary_type_id: z.number().optional().describe("Salary type ID (e.g. annual, hourly). Use loxo_list_salary_types to discover IDs."),
   bonus: z.number().optional().describe("Bonus amount, numeric."),
   description: z.string().optional().describe("The bio / recruiter notes blob. Free text. Replaces existing description."),
+  extra_fields: z.record(
+    z.string(),
+    z.union([z.string(), z.number(), z.array(z.union([z.string(), z.number()]))])
+  ).optional().describe(
+    "Map of {loxo_key: value} for any top-level person field not already covered by an explicit parameter (built-in or tenant-specific dynamic fields, all addressable via person[<key>]). Keys are validated against the dynamic_fields schema cached at server startup; with a cache miss they fall back to /^[a-zA-Z][a-zA-Z0-9_]*$/. Values may be string, number, or an array of strings/numbers (used for Hierarchy fields like skillset_ids that Loxo writes as person[<key>][] form entries, per Phase 0.3 verification)."
+  ),
 });
 
 const AddToPipelineSchema = z.object({
@@ -1123,6 +1129,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             salary_type_id: { type: "number", description: "Salary type ID (e.g. annual, hourly). Use loxo_list_salary_types to discover IDs." },
             bonus: { type: "number", description: "Bonus amount, numeric." },
             description: { type: "string", description: "The bio / recruiter notes blob. Free text. Replaces existing description." },
+            extra_fields: {
+              type: "object",
+              description: "Map of Loxo person field keys (top-level on the person object) to values. Use to set fields not covered by explicit parameters. E.g. { \"expected_salary\": 95000, \"rejection_reason\": \"comp expectations\", \"skillset_ids\": [12, 34] }. Arrays are written as person[<key>][] form entries (used for Hierarchy fields like skillsets and sectors).",
+              additionalProperties: {
+                oneOf: [
+                  { type: "string" },
+                  { type: "number" },
+                  { type: "array", items: { type: ["string", "number"] } }
+                ]
+              }
+            },
           },
           required: ["id"],
         },
@@ -1801,7 +1818,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, tags, replace_tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id, salary, compensation, compensation_currency_id, salary_type_id, bonus, description } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, replace_tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id, salary, compensation, compensation_currency_id, salary_type_id, bonus, description, extra_fields } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
@@ -1835,6 +1852,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (salary_type_id !== undefined) formData.append('person[salary_type_id]', salary_type_id.toString());
         if (bonus !== undefined) formData.append('person[bonus]', bonus.toString());
         if (description !== undefined) formData.append('person[description]', description);
+
+        if (extra_fields) {
+          const SAFE_KEY = /^[a-zA-Z][a-zA-Z0-9_]*$/;
+          // Optional schema-cache check. If the server has loaded /dynamic_fields at
+          // startup, prefer membership in the cached Person key set; otherwise fall
+          // back to the regex. Built-in keys (salary, compensation, etc.) appear in
+          // /dynamic_fields with built_in: true so the cache covers both kinds.
+          const personKeyCache: Set<string> | null = (globalThis as any).LOXO_PERSON_KEY_CACHE ?? null;
+          for (const [key, value] of Object.entries(extra_fields)) {
+            const allowed = personKeyCache ? personKeyCache.has(key) : SAFE_KEY.test(key);
+            if (!allowed) {
+              return {
+                content: [{ type: "text", text: `Invalid extra_fields key: ${key}. Not in cached Person dynamic_fields schema and does not match safe-key pattern.` }],
+                isError: true,
+              };
+            }
+            if (Array.isArray(value)) {
+              // Hierarchy fields (skillset_ids, sector_ids, custom_hierarchy_*) come
+              // back from Loxo as arrays per Phase 0.3 verification, so they must be
+              // written via person[<key>][] form entries (one append per element).
+              // value.toString() on an array would join with commas, which Loxo treats
+              // as a single string and silently drops.
+              for (const v of value) formData.append(`person[${key}][]`, v.toString());
+            } else {
+              formData.append(`person[${key}]`, value.toString());
+            }
+          }
+        }
 
         const resolvedOwnerId = resolveOwnerId(owned_by_id);
         if (resolvedOwnerId) {
