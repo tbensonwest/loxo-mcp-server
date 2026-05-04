@@ -462,6 +462,12 @@ const UpdateCandidateSchema = z.object({
   replace_tags: z.boolean().optional().default(false).describe(
     "When true, REPLACES existing tags with the provided array (uses person[all_raw_tags][]). When false (default), adds the provided tags additively (uses person[raw_tags][]) and leaves existing tags untouched."
   ),
+  salary: z.number().optional().describe("Current salary, numeric (no currency symbol). Pair with compensation_currency_id."),
+  compensation: z.number().optional().describe("Total compensation including base + bonus + equity, numeric."),
+  compensation_currency_id: z.number().optional().describe("Currency ID. Use loxo_list_currencies to discover IDs."),
+  salary_type_id: z.number().optional().describe("Salary type ID (e.g. annual, hourly). Use loxo_list_salary_types to discover IDs."),
+  bonus: z.number().optional().describe("Bonus amount, numeric."),
+  description: z.string().optional().describe("The bio / recruiter notes blob. Free text. Replaces existing description."),
 });
 
 const AddToPipelineSchema = z.object({
@@ -1111,6 +1117,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
             source_type_id: { type: "number", description: "Source type ID. 1206583=LinkedIn, 1206592=API." },
             owned_by_id: { type: "string", description: "Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var." },
+            salary: { type: "number", description: "Current salary, numeric (no currency symbol). Pair with compensation_currency_id." },
+            compensation: { type: "number", description: "Total compensation including base + bonus + equity, numeric." },
+            compensation_currency_id: { type: "number", description: "Currency ID. Use loxo_list_currencies to discover IDs." },
+            salary_type_id: { type: "number", description: "Salary type ID (e.g. annual, hourly). Use loxo_list_salary_types to discover IDs." },
+            bonus: { type: "number", description: "Bonus amount, numeric." },
+            description: { type: "string", description: "The bio / recruiter notes blob. Free text. Replaces existing description." },
           },
           required: ["id"],
         },
@@ -1789,7 +1801,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, tags, replace_tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, replace_tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id, salary, compensation, compensation_currency_id, salary_type_id, bonus, description } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
@@ -1816,6 +1828,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             formData.append('person[custom_hierarchy_2][]', sid.toString());
           }
         }
+
+        if (salary !== undefined) formData.append('person[salary]', salary.toString());
+        if (compensation !== undefined) formData.append('person[compensation]', compensation.toString());
+        if (compensation_currency_id !== undefined) formData.append('person[compensation_currency_id]', compensation_currency_id.toString());
+        if (salary_type_id !== undefined) formData.append('person[salary_type_id]', salary_type_id.toString());
+        if (bonus !== undefined) formData.append('person[bonus]', bonus.toString());
+        if (description !== undefined) formData.append('person[description]', description);
 
         const resolvedOwnerId = resolveOwnerId(owned_by_id);
         if (resolvedOwnerId) {

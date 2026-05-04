@@ -741,6 +741,34 @@ describe('Loxo MCP tool handlers', () => {
       expect(result.isError).toBeFalsy();
       expect(capturedBody).not.toContain('owned_by_id');
     });
+
+    it('sends PUT with compensation fields when provided', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        salary: 95000,
+        compensation: 110000,
+        compensation_currency_id: 1,
+        salary_type_id: 2,
+        bonus: 15000,
+        description: 'Strong candidate from referral, looking to move within 3 months.',
+      });
+
+      expect(capturedBody).toContain('person%5Bsalary%5D=95000');
+      expect(capturedBody).toContain('person%5Bcompensation%5D=110000');
+      expect(capturedBody).toContain('person%5Bcompensation_currency_id%5D=1');
+      expect(capturedBody).toContain('person%5Bsalary_type_id%5D=2');
+      expect(capturedBody).toContain('person%5Bbonus%5D=15000');
+      expect(capturedBody).toContain('person%5Bdescription%5D=Strong+candidate');
+    });
   });
 
   // ─── loxo_apply_to_job ────────────────────────────────────────────────────
