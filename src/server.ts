@@ -459,6 +459,9 @@ const UpdateCandidateSchema = z.object({
   person_type_id: z.number().int().optional().describe("Person type ID. 80073=Active Candidate, 78122=Prospect Candidate. Use loxo_list_person_types to discover."),
   source_type_id: z.number().int().optional().describe("Source type ID. E.g. 1206583=LinkedIn, 1206592=API. Use loxo_list_source_types to discover."),
   owned_by_id: z.coerce.string().regex(/^\d+$/, "owned_by_id must be numeric").optional().describe("Loxo user ID to set as record owner. Overrides LOXO_DEFAULT_OWNER_ID env var."),
+  replace_tags: z.boolean().optional().default(false).describe(
+    "When true, REPLACES existing tags with the provided array (uses person[all_raw_tags][]). When false (default), adds the provided tags additively (uses person[raw_tags][]) and leaves existing tags untouched."
+  ),
 });
 
 const AddToPipelineSchema = z.object({
@@ -1101,7 +1104,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             current_title: { type: "string", description: "Current job title." },
             current_company: { type: "string", description: "Current employer." },
             location: { type: "string", description: "City, region, or country." },
-            tags: { type: "array", items: { type: "string" }, description: "Tags to set. E.g. ['cv-import', 'debt-advisory']." },
+            tags: { type: "array", items: { type: "string" }, description: "Tags to add (additive by default, does not remove existing). Use replace_tags=true to set the full list explicitly. E.g. ['cv-import', 'debt-advisory']." },
+            replace_tags: { type: "boolean", description: "Default false (additive). Set to true to REPLACE existing tags with the provided array. Use with care: replace mode wipes any tags not in the input." },
             skillset_ids: { type: "array", items: { type: "number" }, description: "Skillset IDs from loxo_list_skillsets. E.g. [5704030] = Debt Advisory." },
             sector_ids: { type: "array", items: { type: "number" }, description: "Sector IDs from loxo_list_skillsets. E.g. [5690364] = Financial Services." },
             person_type_id: { type: "number", description: "Person type ID. 80073=Active Candidate, 78122=Prospect Candidate." },
@@ -1785,7 +1789,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case "loxo_update_candidate": {
-        const { id, name: updateName, email, phone, current_title, current_company, location, tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id } = UpdateCandidateSchema.parse(args);
+        const { id, name: updateName, email, phone, current_title, current_company, location, tags, replace_tags, skillset_ids, sector_ids, person_type_id, source_type_id, owned_by_id } = UpdateCandidateSchema.parse(args);
 
         const formData = new URLSearchParams();
         if (updateName) formData.append('person[name]', updateName);
@@ -1797,8 +1801,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (person_type_id) formData.append('person[person_type_id]', person_type_id.toString());
         if (source_type_id) formData.append('person[source_type_id]', source_type_id.toString());
         if (tags) {
+          const fieldName = replace_tags ? 'person[all_raw_tags][]' : 'person[raw_tags][]';
           for (const tag of tags) {
-            formData.append('person[all_raw_tags][]', tag);
+            formData.append(fieldName, tag);
           }
         }
         if (skillset_ids) {

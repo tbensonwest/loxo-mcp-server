@@ -572,13 +572,14 @@ describe('Loxo MCP tool handlers', () => {
         id: '42',
         current_title: 'Senior Analyst',
         tags: ['debt-advisory', 'sourced'],
+        replace_tags: true,
         skillset_ids: [5704030],
         person_type_id: 80073,
         source_type_id: 1206583,
       });
       expect(result.isError).toBeFalsy();
       expect(capturedMethod).toBe('PUT');
-      // Tags must use array notation person[all_raw_tags][]=x
+      // Tags must use array notation person[all_raw_tags][]=x when replace_tags=true
       expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=debt-advisory');
       expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=sourced');
       // Skillsets use custom_hierarchy_1
@@ -587,6 +588,53 @@ describe('Loxo MCP tool handlers', () => {
       expect(capturedBody).toContain('person%5Bperson_type_id%5D=80073');
       // Source type
       expect(capturedBody).toContain('person%5Bsource_type_id%5D=1206583');
+    });
+
+    it('sends PUT with person[raw_tags][] (additive) by default, NOT person[all_raw_tags][]', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 42, name: 'Jane Smith', all_raw_tags: 'existing-tag, debt-advisory' }
+          })),
+        });
+      }));
+
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        tags: ['debt-advisory', 'new-tag'],
+      });
+
+      expect(result.isError).toBeFalsy();
+      // Default is additive: raw_tags[], NOT all_raw_tags[]
+      expect(capturedBody).toContain('person%5Braw_tags%5D%5B%5D=debt-advisory');
+      expect(capturedBody).toContain('person%5Braw_tags%5D%5B%5D=new-tag');
+      expect(capturedBody).not.toContain('person%5Ball_raw_tags%5D%5B%5D');
+    });
+
+    it('sends PUT with person[all_raw_tags][] (replace) when replace_tags=true', async () => {
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({
+            person: { id: 42, name: 'Jane Smith', all_raw_tags: 'replaced-tag' }
+          })),
+        });
+      }));
+
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        tags: ['replaced-tag'],
+        replace_tags: true,
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Ball_raw_tags%5D%5B%5D=replaced-tag');
+      expect(capturedBody).not.toContain('person%5Braw_tags%5D%5B%5D');
     });
 
     it('returns error when only id is provided (empty body guard)', async () => {
