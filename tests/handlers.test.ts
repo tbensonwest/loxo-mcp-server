@@ -828,6 +828,45 @@ describe('Loxo MCP tool handlers', () => {
       // Crucially, NOT a comma-joined single value:
       expect(capturedBody).not.toContain('person%5Bskillset_ids%5D=12%2C34');
     });
+
+    it('allows extra_fields keys present in LOXO_PERSON_KEY_CACHE even when they would fail the safe-key regex', async () => {
+      // When the cache is populated (loaded by a future PR from /dynamic_fields),
+      // it is the source of truth and trumps the SAFE_KEY regex fallback.
+      vi.stubGlobal('LOXO_PERSON_KEY_CACHE', new Set(['custom_hierarchy_1', 'fee-percentage']));
+      let capturedBody = '';
+      vi.stubGlobal('fetch', vi.fn().mockImplementation((_url: string, opts: any) => {
+        capturedBody = opts?.body || '';
+        return Promise.resolve({
+          ok: true, status: 200, statusText: 'OK',
+          text: () => Promise.resolve(JSON.stringify({ person: { id: 42 } })),
+        });
+      }));
+
+      // 'fee-percentage' fails the SAFE_KEY regex (hyphens not allowed) but is in
+      // the cache, so the handler should accept and forward it.
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        extra_fields: { 'fee-percentage': 25 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      expect(capturedBody).toContain('person%5Bfee-percentage%5D=25');
+    });
+
+    it('rejects extra_fields keys not present in LOXO_PERSON_KEY_CACHE (strict allowlist when cache is loaded)', async () => {
+      // Inverse of the test above: when the cache is populated, the regex
+      // fallback is bypassed, so a regex-safe key that is not in the cache
+      // is still rejected. This guards against typoed keys reaching Loxo.
+      vi.stubGlobal('LOXO_PERSON_KEY_CACHE', new Set(['expected_salary']));
+
+      const result = await callTool(client, 'loxo_update_candidate', {
+        id: '42',
+        // 'unknown_field' matches the SAFE_KEY regex but is not in the cache.
+        extra_fields: { unknown_field: 'value' },
+      });
+
+      expect(result.isError).toBe(true);
+    });
   });
 
   // ─── loxo_apply_to_job ────────────────────────────────────────────────────

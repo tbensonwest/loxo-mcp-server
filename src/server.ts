@@ -1859,7 +1859,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // startup, prefer membership in the cached Person key set; otherwise fall
           // back to the regex. Built-in keys (salary, compensation, etc.) appear in
           // /dynamic_fields with built_in: true so the cache covers both kinds.
-          const personKeyCache: Set<string> | null = (globalThis as any).LOXO_PERSON_KEY_CACHE ?? null;
+          const personKeyCache: Set<string> | null = globalThis.LOXO_PERSON_KEY_CACHE ?? null;
           for (const [key, value] of Object.entries(extra_fields)) {
             const allowed = personKeyCache ? personKeyCache.has(key) : SAFE_KEY.test(key);
             if (!allowed) {
